@@ -502,24 +502,26 @@
         // Preload for instant display
         try { await showAd({ type: 'preload' }); } catch (e) {}
 
-        const result = await showAd();
+await showAd();
 
-        // DEBUG: remove after you confirm the field name
-        showToast('Result: ' + JSON.stringify(result));
-
-        // Reward only on full watch
-        if (result && result.reward_event_type === 'valued') {
-          if (state.mode === 'bubbles') {
-            const skin = nextLocked('bubbles');
-            if (skin) { state.bubbleUnlocked.add(skin); applyBubbleSkin(skin); showToast(`Bubble skin "${skin}" unlocked ✨`); }
-          } else {
-            const skin = nextLocked('slime');
-            if (skin) { state.slimeUnlocked.add(skin); applySlimeSkin(skin); showToast(`Slime skin "${skin}" unlocked ✨`); }
-          }
-          state.adCooldownUntil = Date.now() + state.adCooldownMs;
-        } else {
-          showToast('Ad not finished — no reward');
-        }
+// Monetag's SDK resolves the Promise after the ad ends.
+// The official integration pattern rewards directly on resolve.
+if (state.mode === 'bubbles') {
+    const skin = nextLocked('bubbles');
+    if (skin) {
+        state.bubbleUnlocked.add(skin);
+        applyBubbleSkin(skin);
+        showToast(`Bubble skin "${skin}" unlocked ✨`);
+    }
+} else {
+    const skin = nextLocked('slime');
+    if (skin) {
+        state.slimeUnlocked.add(skin);
+        applySlimeSkin(skin);
+        showToast(`Slime skin "${skin}" unlocked ✨`);
+    }
+}
+state.adCooldownUntil = Date.now() + state.adCooldownMs;
       } catch (err) {
         console.error('[PopZen] Ad error:', err);
         showToast('Ad unavailable, try later');
