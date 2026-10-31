@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>PopZen</title>
+
+  <!-- Telegram Mini App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Monetag SDK (Rewarded Interstitial) -->
+  <script src="https://libtl.com/sdk.js" data-zone="12162761" data-sdk="show_12162761"></script>
+
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #fff; overflow: hidden; user-select: none; overscroll-behavior: none;
+    }
+    #app {
+      display: flex; flex-direction: column; height: 100vh;
+      padding: 16px;
+      padding-top: max(16px, env(safe-area-inset-top));
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+    header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px;
+    }
+    .title {
+      font-size: 22px; font-weight: 700; letter-spacing: 0.5px;
+      background: linear-gradient(90deg, #ff6bcb, #8a7bff, #4facfe);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .score-box {
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px; padding: 6px 14px; font-size: 15px; font-weight: 600;
+      min-width: 90px; text-align: center;
+    }
+    .score-box span { color: #8a7bff; }
+
+    /* Mode tabs */
+    .tabs {
+      display: flex; gap: 8px; margin-bottom: 12px;
+    }
+    .tab {
+      flex: 1; padding: 10px; border-radius: 12px; text-align: center;
+      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .tab.active {
+      background: rgba(138,123,255,0.25); border-color: rgba(138,123,255,0.6);
+    }
+
+    /* Panels */
+    .panel { flex: 1; display: none; overflow: hidden; }
+    .panel.active { display: flex; flex-direction: column; }
+
+    /* ===== BUBBLES ===== */
+    #grid {
+      flex: 1; display: grid; grid-template-columns: repeat(6, 1fr);
+      gap: 8px; align-content: start; overflow: hidden;
+    }
+    .bubble {
+      aspect-ratio: 1 / 1; border-radius: 50%; cursor: pointer; position: relative;
+      transition: transform 0.08s ease, opacity 0.2s ease;
+      box-shadow: inset -3px -3px 8px rgba(0,0,0,0.25),
+                  inset 3px 3px 8px rgba(255,255,255,0.35),
+                  0 2px 6px rgba(0,0,0,0.3);
+    }
+    .bubble:active { transform: scale(0.85); }
+    .bubble.popped { opacity: 0; transform: scale(0.3); pointer-events: none; }
+    .bubble.c0 { background: radial-gradient(circle at 30% 30%, #ff9a9e, #f6416c); }
+    .bubble.c1 { background: radial-gradient(circle at 30% 30%, #a1c4fd, #3a7bd5); }
+    .bubble.c2 { background: radial-gradient(circle at 30% 30%, #fddb92, #f7a325); }
+    .bubble.c3 { background: radial-gradient(circle at 30% 30%, #a8edea, #28c7a8); }
+    .bubble.c4 { background: radial-gradient(circle at 30% 30%, #d4a5ff, #8a2be2); }
+    .bubble.c5 { background: radial-gradient(circle at 30% 30%, #ffd1ff, #ff6bcb); }
+    body.skin-glitter .bubble {
+      background-image:
+        radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9) 0%, transparent 40%),
+        repeating-conic-gradient(from 0deg, rgba(255,255,255,0.35) 0deg 10deg, transparent 10deg 20deg);
+      background-blend-mode: overlay;
+    }
+    body.skin-neon .bubble {
+      box-shadow: 0 0 14px 2px currentColor,
+                  inset -3px -3px 8px rgba(0,0,0,0.25),
+                  inset 3px 3px 8px rgba(255,255,255,0.35);
+    }
+
+    /* ===== SLIME ===== */
+    #slimeWrap {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      position: relative; touch-action: none; cursor: grab;
+    }
+    #slimeWrap:active { cursor: grabbing; }
+    #slimeSvg { width: 100%; height: 100%; max-height: 420px; }
+    #slimeBody {
+      fill: url(#slimeGrad);
+      filter: drop-shadow(0 8px 20px rgba(138,123,255,0.4));
+      transition: fill 0.3s;
+    }
+    body.slime-glitter #slimeBody { fill: url(#slimeGlitter); }
+    body.slime-lava   #slimeBody { fill: url(#slimeLava); }
+    .slime-hint {
+      position: absolute; bottom: 8px; left: 0; right: 0; text-align: center;
+      font-size: 12px; opacity: 0.55; pointer-events: none;
+    }
+
+    /* Footer buttons */
+    .footer { margin-top: 12px; display: flex; gap: 10px; }
+    button {
+      flex: 1; border: none; border-radius: 14px; padding: 14px 10px;
+      font-size: 15px; font-weight: 600; color: #fff; cursor: pointer;
+      transition: opacity 0.15s ease, transform 0.1s ease;
+    }
+    button:active { transform: scale(0.97); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #resetBtn { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); }
+    #adBtn {
+      background: linear-gradient(90deg, #ff6bcb, #8a7bff);
+      box-shadow: 0 4px 16px rgba(138,123,255,0.4);
+    }
+
+    #toast {
+      position: fixed; bottom: 100px; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(0,0,0,0.85); padding: 10px 20px; border-radius: 20px;
+      font-size: 14px; opacity: 0; pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s; white-space: nowrap; z-index: 10;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="title">PopZen</div>
+      <div class="score-box">Score: <span id="score">0</span></div>
+    </header>
+
+    <div class="tabs">
+      <div class="tab active" data-mode="bubbles">🫧 Bubbles</div>
+      <div class="tab" data-mode="slime">🟢 Slime</div>
+    </div>
+
+    <!-- BUBBLES PANEL -->
+    <div class="panel active" id="panel-bubbles">
+      <div id="grid"></div>
+    </div>
+
+    <!-- SLIME PANEL -->
+    <div class="panel" id="panel-slime">
+      <div id="slimeWrap">
+        <svg id="slimeSvg" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <radialGradient id="slimeGrad" cx="40%" cy="35%">
+              <stop offset="0%" stop-color="#a8edea"/>
+              <stop offset="100%" stop-color="#28c7a8"/>
+            </radialGradient>
+            <radialGradient id="slimeGlitter" cx="40%" cy="35%">
+              <stop offset="0%" stop-color="#ffd1ff"/>
+              <stop offset="60%" stop-color="#ff6bcb"/>
+              <stop offset="100%" stop-color="#8a2be2"/>
+            </radialGradient>
+            <radialGradient id="slimeLava" cx="40%" cy="35%">
+              <stop offset="0%" stop-color="#fddb92"/>
+              <stop offset="100%" stop-color="#f6416c"/>
+            </radialGradient>
+          </defs>
+          <path id="slimeBody" d=""/>
+        </svg>
+        <div class="slime-hint">Drag the slime to stretch it 🫳</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <button id="resetBtn">Reset</button>
+      <button id="adBtn">🎁 Unlock</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    /* =========================================================
+       TELEGRAM
+       ========================================================= */
+    const tg = window.Telegram?.WebApp;
+    if (tg) { tg.ready(); tg.expand(); }
+
+    /* =========================================================
+       STATE
+       ========================================================= */
+    const state = {
+      mode: 'bubbles',
+      score: 0,
+      // Bubbles skins
+      bubbleSkins: ['default', 'glitter', 'neon'],
+      bubbleUnlocked: new Set(['default']),
+      bubbleActive: 'default',
+      // Slime skins
+      slimeSkins: ['default', 'glitter', 'lava'],
+      slimeUnlocked: new Set(['default']),
+      slimeActive: 'default',
+      // Ad cooldown
+      adCooldownUntil: 0,
+      adPlaying: false,
+      adCooldownMs: 60000,
+    };
+
+    /* =========================================================
+       DOM
+       ========================================================= */
+    const gridEl = document.getElementById('grid');
+    const scoreEl = document.getElementById('score');
+    const adBtn = document.getElementById('adBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const toastEl = document.getElementById('toast');
+    const tabs = document.querySelectorAll('.tab');
+    const panelBubbles = document.getElementById('panel-bubbles');
+    const panelSlime = document.getElementById('panel-slime');
+
+    /* =========================================================
+       AUDIO (synth, no files)
+       ========================================================= */
+    let audioCtx = null;
+    function beep(freqStart, freqEnd, dur, gainVal = 0.15, type = 'sine') {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const t = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freqStart, t);
+        osc.frequency.exponentialRampToValueAtTime(Math.max(40, freqEnd), t + dur);
+        g.gain.setValueAtTime(gainVal, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        osc.connect(g).connect(audioCtx.destination);
+        osc.start(t); osc.stop(t + dur + 0.02);
+      } catch (e) {}
+    }
+    const playPop = () => beep(600 + Math.random()*300, 120, 0.1, 0.15);
+    const playSquish = () => beep(300, 80, 0.12, 0.12, 'triangle');
+
+    function haptic(type = 'light') {
+      try { tg?.HapticFeedback?.impactOccurred(type); } catch (e) {}
+    }
+
+    /* =========================================================
+       TOAST
+       ========================================================= */
+    let toastTimer = null;
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+    }
+
+    /* =========================================================
+       MODE SWITCH
+       ========================================================= */
+    function setMode(mode) {
+      state.mode = mode;
+      tabs.forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+      panelBubbles.classList.toggle('active', mode === 'bubbles');
+      panelSlime.classList.toggle('active', mode === 'slime');
+      state.score = 0;
+      scoreEl.textContent = '0';
+      if (mode === 'bubbles') buildGrid();
+      else resetSlime();
+      updateAdButton();
+    }
+    tabs.forEach(t => t.addEventListener('click', () => setMode(t.dataset.mode)));
+
+    /* =========================================================
+       BUBBLES MODE
+       ========================================================= */
+    const GRID_COUNT = 36;
+    function buildGrid() {
+      gridEl.innerHTML = '';
+      state.score = 0;
+      scoreEl.textContent = '0';
+      for (let i = 0; i < GRID_COUNT; i++) {
+        const b = document.createElement('div');
+        const colorIdx = Math.floor(Math.random() * 6);
+        b.className = `bubble c${colorIdx}`;
+        const scale = 0.85 + Math.random() * 0.25;
+        b.style.transform = `scale(${scale})`;
+        b.addEventListener('pointerdown', () => popBubble(b));
+        gridEl.appendChild(b);
+      }
+    }
+    function popBubble(el) {
+      if (el.classList.contains('popped')) return;
+      el.classList.add('popped');
+      state.score++;
+      scoreEl.textContent = state.score;
+      playPop();
+      haptic('light');
+      if (state.score === GRID_COUNT) showToast('All popped! 🎉');
+    }
+
+    /* =========================================================
+       SLIME MODE
+       ========================================================= */
+    const svg = document.getElementById('slimeSvg');
+    const slimePath = document.getElementById('slimeBody');
+    const slimeWrap = document.getElementById('slimeWrap');
+
+    const slime = {
+      cx: 150, cy: 150, baseR: 70,
+      pullX: 0, pullY: 0,          // current finger offset
+      targetX: 0, targetY: 0,      // target finger offset
+      velX: 0, velY: 0,
+      dragging: false,
+      raf: null,
+      stretchScore: 0,
+      squishPlayed: false,
+    };
+
+    function slimeLoop() {
+      // Spring physics: pull eases toward target, then springs back
+      const stiffness = slime.dragging ? 0.25 : 0.08;
+      const damping = slime.dragging ? 0.75 : 0.82;
+      slime.velX = (slime.velX + (slime.targetX - slime.pullX) * stiffness) * damping;
+      slime.velY = (slime.velY + (slime.targetY - slime.pullY) * stiffness) * damping;
+      slime.pullX += slime.velX;
+      slime.pullY += slime.velY;
+
+      drawSlime();
+
+      // Track stretch score
+      const dist = Math.hypot(slime.pullX, slime.pullY);
+      if (dist > 40 && !slime.squishPlayed) {
+        slime.squishPlayed = true;
+        playSquish();
+        haptic('medium');
+      } else if (dist < 20) {
+        slime.squishPlayed = false;
+      }
+
+      slime.raf = requestAnimationFrame(slimeLoop);
+    }
+
+    function drawSlime() {
+      const { cx, cy, baseR, pullX, pullY } = slime;
+      const d = Math.hypot(pullX, pullY);
+      const angle = Math.atan2(pullY, pullX);
+      // Stretch factor based on pull distance
+      const stretch = Math.min(1.8, 1 + d / 200);
+      const squash = 1 / stretch;
+
+      // Build an organic blob using cubic beziers around the circle
+      // and pulling the nose toward the finger.
+      const noseX = cx + Math.cos(angle) * (baseR * stretch);
+      const noseY = cy + Math.sin(angle) * (baseR * stretch);
+      const backX = cx - Math.cos(angle) * (baseR * squash * 0.9);
+      const backY = cy - Math.sin(angle) * (baseR * squash * 0.9);
+
+      const perpX = -Math.sin(angle);
+      const perpY = Math.cos(angle);
+      const sideOffset = baseR * (1 - 0.15 * (stretch - 1));
+
+      const s1x = cx + perpX * sideOffset;
+      const s1y = cy + perpY * sideOffset;
+      const s2x = cx - perpX * sideOffset;
+      const s2y = cy - perpY * sideOffset;
+
+      // Control points
+      const c1x = (noseX + s1x) / 2 + perpX * baseR * 0.6;
+      const c1y = (noseY + s1y) / 2 + perpY * baseR * 0.6;
+      const c2x = (noseX + s2x) / 2 - perpX * baseR * 0.6;
+      const c2y = (noseY + s2y) / 2 - perpY * baseR * 0.6;
+      const c3x = (backX + s2x) / 2 - perpX * baseR * 0.5;
+      const c3y = (backY + s2y) / 2 - perpY * baseR * 0.5;
+      const c4x = (backX + s1x) / 2 + perpX * baseR * 0.5;
+      const c4y = (backY + s1y) / 2 + perpY * baseR * 0.5;
+
+      const d_path =
+        `M ${s1x} ${s1y} ` +
+        `Q ${c1x} ${c1y} ${noseX} ${noseY} ` +
+        `Q ${c2x} ${c2y} ${s2x} ${s2y} ` +
+        `Q ${c3x} ${c3y} ${backX} ${backY} ` +
+        `Q ${c4x} ${c4y} ${s1x} ${s1y} Z`;
+
+      slimePath.setAttribute('d', d_path);
+    }
+
+    function resetSlime() {
+      slime.pullX = 0; slime.pullY = 0;
+      slime.targetX = 0; slime.targetY = 0;
+      slime.velX = 0; slime.velY = 0;
+      slime.dragging = false;
+      slime.stretchScore = 0;
+      if (!slime.raf) slime.raf = requestAnimationFrame(slimeLoop);
+    }
+
+    function slimePointer(e) {
+      const rect = svg.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 300;
+      const y = ((e.clientY - rect.top) / rect.height) * 300;
+      const dx = x - slime.cx;
+      const dy = y - slime.cy;
+      // Clamp stretch
+      const maxPull = 90;
+      const dist = Math.hypot(dx, dy);
+      const f = dist > maxPull ? maxPull / dist : 1;
+      slime.targetX = dx * f;
+      slime.targetY = dy * f;
+      const currentDist = Math.hypot(slime.targetX, slime.targetY);
+      if (currentDist > state.score) {
+        state.score = Math.floor(currentDist);
+        scoreEl.textContent = state.score;
+      }
+    }
+
+    slimeWrap.addEventListener('pointerdown', (e) => {
+      slime.dragging = true;
+      slime.squishPlayed = false;
+      slimePointer(e);
+      slimeWrap.setPointerCapture?.(e.pointerId);
+    });
+    slimeWrap.addEventListener('pointermove', (e) => {
+      if (slime.dragging) slimePointer(e);
+    });
+    slimeWrap.addEventListener('pointerup', () => { slime.dragging = false; slime.targetX = 0; slime.targetY = 0; });
+    slimeWrap.addEventListener('pointerleave', () => { slime.dragging = false; slime.targetX = 0; slime.targetY = 0; });
+
+    /* =========================================================
+       SKIN / AD BUTTON
+       ========================================================= */
+    function nextLocked(mode) {
+      if (mode === 'bubbles') return state.bubbleSkins.find(s => !state.bubbleUnlocked.has(s));
+      return state.slimeSkins.find(s => !state.slimeUnlocked.has(s));
+    }
+
+    function cooldownRemaining() {
+      return Math.max(0, state.adCooldownUntil - Date.now());
+    }
+
+    function updateAdButton() {
+      if (state.adPlaying) {
+        adBtn.textContent = 'Loading ad...';
+        adBtn.disabled = true;
+        return;
+      }
+      const next = nextLocked(state.mode);
+      if (!next) {
+        adBtn.textContent = '✨ All unlocked';
+        adBtn.disabled = true;
+        return;
+      }
+      const cd = cooldownRemaining();
+      if (cd > 0) {
+        adBtn.textContent = `⏳ ${Math.ceil(cd / 1000)}s`;
+        adBtn.disabled = true;
+        setTimeout(updateAdButton, 500);
+        return;
+      }
+      const label = state.mode === 'bubbles' ? 'bubble skin' : 'slime skin';
+      adBtn.textContent = `🎁 Unlock ${next} ${label}`;
+      adBtn.disabled = false;
+    }
+
+    function applyBubbleSkin(skin) {
+      state.bubbleActive = skin;
+      document.body.classList.remove('skin-glitter', 'skin-neon');
+      if (skin !== 'default') document.body.classList.add(`skin-${skin}`);
+    }
+    function applySlimeSkin(skin) {
+      state.slimeActive = skin;
+      document.body.classList.remove('slime-glitter', 'slime-lava');
+      if (skin !== 'default') document.body.classList.add(`slime-${skin}`);
+    }
+
+    /* =========================================================
+       MONETAG REWARDED INTERSTITIAL
+       --------------------------------------------------------
+       SDK function: show_12162761
+       Reward verified via result.reward_event_type === 'valued'
+       ========================================================= */
+    async function watchRewardedAd() {
+      if (state.adPlaying) return;
+      if (cooldownRemaining() > 0) return;
+
+      const showAd = window.show_12162761;
+      if (typeof showAd !== 'function') {
+        showToast('Ad SDK not loaded');
+        console.warn('[PopZen] show_12162761 not found. Check the Monetag <script> tag.');
+        return;
+      }
+
+      state.adPlaying = true;
+      updateAdButton();
+
+      try {
+        // Preload for instant display
+        try { await showAd({ type: 'preload' }); } catch (e) {}
+
+        const result = await showAd();
+
+        // DEBUG: remove after you confirm the field name
+        console.log('[PopZen] Monetag result:', result);
+
+        // Reward only on full watch
+        if (result && result.reward_event_type === 'valued') {
+          if (state.mode === 'bubbles') {
+            const skin = nextLocked('bubbles');
+            if (skin) { state.bubbleUnlocked.add(skin); applyBubbleSkin(skin); showToast(`Bubble skin "${skin}" unlocked ✨`); }
+          } else {
+            const skin = nextLocked('slime');
+            if (skin) { state.slimeUnlocked.add(skin); applySlimeSkin(skin); showToast(`Slime skin "${skin}" unlocked ✨`); }
+          }
+          state.adCooldownUntil = Date.now() + state.adCooldownMs;
+        } else {
+          showToast('Ad not finished — no reward');
+        }
+      } catch (err) {
+        console.error('[PopZen] Ad error:', err);
+        showToast('Ad unavailable, try later');
+      } finally {
+        state.adPlaying = false;
+        updateAdButton();
+      }
+    }
+
+    /* =========================================================
+       WIRE UP
+       ========================================================= */
+    resetBtn.addEventListener('click', () => {
+      if (state.mode === 'bubbles') buildGrid();
+      else { resetSlime(); state.score = 0; scoreEl.textContent = '0'; }
+    });
+    adBtn.addEventListener('click', watchRewardedAd);
+
+    // init
+    buildGrid();
+    applyBubbleSkin('default');
+    applySlimeSkin('default');
+    resetSlime();
+    updateAdButton();
+  </script>
+</body>
+</html>
