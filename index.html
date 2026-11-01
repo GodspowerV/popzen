@@ -135,7 +135,7 @@
       content: '💥';
       position: absolute; inset: 0;
       display: flex; align-items: center; justify-content: center;
-      font-size: 60%; 
+      font-size: 60%;
     }
     @keyframes trapPulse {
       0%, 100% { transform: scale(1); }
@@ -434,10 +434,13 @@
       return 0.30;
     }
 
-    function buildGrid() {
+    // buildGrid(opts): preserveScore keeps the running score and record flag
+    // (used for mid-game auto-rebuild when all safe bubbles are cleared).
+    function buildGrid(opts = {}) {
+      const { preserveScore = false } = opts;
       gridEl.innerHTML = '';
       state.gameOver = false;
-      state.recordShownThisGame = false;
+      if (!preserveScore) state.recordShownThisGame = false;
 
       // Determine trap count — never all traps, always at least 1 trap, always ≥5 safe
       const rate = trapRateForScore(state.score);
@@ -466,6 +469,9 @@
         gridEl.appendChild(b);
       }
 
+      // Apply current trap-vision state to the fresh grid immediately.
+      // If trapVisionUntil > now → new traps show right away.
+      // If trapVisionUntil <= now → new traps stay hidden until next ad.
       refreshTrapVisibility();
     }
 
@@ -474,7 +480,7 @@
       if (el.classList.contains('popped') || el.classList.contains('fading')) return;
 
       if (el.classList.contains('trap')) {
-        // Trap — only triggers if it's actually a trap
+        // Trap hit — game over. Works whether or not trap vision is active.
         playTrap();
         haptic('heavy');
         state.gameOver = true;
@@ -489,21 +495,22 @@
       haptic('light');
       setScore(state.score + 1);
 
-      // Check if all safe bubbles popped
+      // Check if all safe bubbles popped → load next wave immediately
       checkGridCleared();
     }
 
     function checkGridCleared() {
       const remainingSafe = gridEl.querySelectorAll('.bubble:not(.trap):not(.popped)');
-      if (remainingSafe.length === 0) {
-        // Fade out traps
+      if (remainingSafe.length === 0 && !state.gameOver) {
+        // Fade out remaining traps for visual feedback
         gridEl.querySelectorAll('.bubble.trap:not(.fading)').forEach(t => {
           t.classList.add('fading');
         });
         showToast('Grid cleared! 🎉');
-        setTimeout(() => {
-          if (!state.gameOver) buildGrid();
-        }, 500);
+        // Rebuild immediately — no waiting on the trap-vision timer.
+        // buildGrid() -> refreshTrapVisibility() reads the LIVE trap-vision state,
+        // so new traps are visible if the timer is still running, hidden if expired.
+        buildGrid({ preserveScore: true });
       }
     }
 
@@ -522,7 +529,7 @@
         document.getElementById('recordScore').textContent = v;
         recordOverlay.classList.add('show');
       } else if (v > state.bestScore) {
-        // Update best silently if record already shown
+        // Update best silently if record already shown this session
         state.bestScore = v;
         bestEl.textContent = v;
         localStorage.setItem('popzen_best', String(v));
