@@ -714,12 +714,6 @@
         adBtn.disabled = true;
         return;
       }
-      const next = nextLocked(state.mode);
-      if (!next) {
-        adBtn.textContent = '✨ All unlocked';
-        adBtn.disabled = true;
-        return;
-      }
       const cd = cooldownRemaining();
       if (cd > 0) {
         adBtn.textContent = `⏳ ${Math.ceil(cd / 1000)}s`;
@@ -727,7 +721,12 @@
         setTimeout(updateAdButton, 500);
         return;
       }
-      adBtn.textContent = `🎁 Unlock ${next} + 👁️ 60s`;
+      // Cooldown clear → button is always live. Skins are an optional one-time
+      // bonus; trap vision is the recurring reward and must never be "used up".
+      const next = nextLocked(state.mode);
+      adBtn.textContent = next
+        ? `🎁 Unlock ${next} + 👁️ 60s`
+        : `👁️ Watch ad — 60s Trap Vision`;
       adBtn.disabled = false;
     }
 
@@ -766,7 +765,7 @@
 
         await showAd();
 
-        // Reward: unlock next skin AND grant 60s trap vision
+        // Reward: unlock next skin (if any) AND grant 60s trap vision (always).
         let unlockedSkin = null;
         if (state.mode === 'bubbles') {
           unlockedSkin = nextLocked('bubbles');
