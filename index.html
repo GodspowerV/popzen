@@ -41,10 +41,20 @@
     }
     .score-box span { color: #8a7bff; }
 
-    /* Mode tabs */
-    .tabs {
-      display: flex; gap: 8px; margin-bottom: 12px;
+    /* Streak banner */
+    .streak-banner {
+      background: linear-gradient(90deg, rgba(255,107,203,0.2), rgba(138,123,255,0.2));
+      border: 1px solid rgba(255,107,203,0.4);
+      border-radius: 12px; padding: 8px 14px;
+      font-size: 14px; font-weight: 600; margin-bottom: 10px;
+      display: flex; align-items: center; gap: 6px;
     }
+    .streak-reward {
+      margin-left: auto; font-size: 12px; color: #ffd1ff; font-weight: 500;
+    }
+
+    /* Mode tabs */
+    .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
     .tab {
       flex: 1; padding: 10px; border-radius: 12px; text-align: center;
       background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
@@ -104,25 +114,32 @@
       transition: fill 0.3s;
     }
     body.slime-glitter #slimeBody { fill: url(#slimeGlitter); }
-    body.slime-lava   #slimeBody { fill: url(#slimeLava); }
+    body.slime-lava    #slimeBody { fill: url(#slimeLava); }
     .slime-hint {
       position: absolute; bottom: 8px; left: 0; right: 0; text-align: center;
       font-size: 12px; opacity: 0.55; pointer-events: none;
     }
 
-    /* Footer buttons */
-    .footer { margin-top: 12px; display: flex; gap: 10px; }
+    /* Footer */
+    .footer { margin-top: 12px; display: flex; gap: 8px; }
     button {
-      flex: 1; border: none; border-radius: 14px; padding: 14px 10px;
-      font-size: 15px; font-weight: 600; color: #fff; cursor: pointer;
+      border: none; border-radius: 14px; padding: 14px 10px;
+      font-size: 14px; font-weight: 600; color: #fff; cursor: pointer;
       transition: opacity 0.15s ease, transform 0.1s ease;
+      flex: 1;
     }
     button:active { transform: scale(0.97); }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
-    #resetBtn { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); }
+    #resetBtn { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); flex: 0.8; }
+    #shareBtn {
+      background: rgba(79,172,254,0.25);
+      border: 1px solid rgba(79,172,254,0.5);
+      flex: 0.8;
+    }
     #adBtn {
       background: linear-gradient(90deg, #ff6bcb, #8a7bff);
       box-shadow: 0 4px 16px rgba(138,123,255,0.4);
+      flex: 1.4;
     }
 
     #toast {
@@ -131,6 +148,7 @@
       background: rgba(0,0,0,0.85); padding: 10px 20px; border-radius: 20px;
       font-size: 14px; opacity: 0; pointer-events: none;
       transition: opacity 0.25s, transform 0.25s; white-space: nowrap; z-index: 10;
+      max-width: 90vw; text-align: center;
     }
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   </style>
@@ -141,6 +159,12 @@
       <div class="title">PopZen</div>
       <div class="score-box">Score: <span id="score">0</span></div>
     </header>
+
+    <!-- Daily streak banner (shown by JS) -->
+    <div id="streakBanner" class="streak-banner" style="display:none;">
+      🔥 <span id="streakCount">0</span>-day streak
+      <span id="streakReward" class="streak-reward"></span>
+    </div>
 
     <div class="tabs">
       <div class="tab active" data-mode="bubbles">🫧 Bubbles</div>
@@ -179,6 +203,7 @@
 
     <div class="footer">
       <button id="resetBtn">Reset</button>
+      <button id="shareBtn">📤 Share</button>
       <button id="adBtn">🎁 Unlock</button>
     </div>
   </div>
@@ -198,15 +223,12 @@
     const state = {
       mode: 'bubbles',
       score: 0,
-      // Bubbles skins
       bubbleSkins: ['default', 'glitter', 'neon'],
       bubbleUnlocked: new Set(['default']),
       bubbleActive: 'default',
-      // Slime skins
       slimeSkins: ['default', 'glitter', 'lava'],
       slimeUnlocked: new Set(['default']),
       slimeActive: 'default',
-      // Ad cooldown
       adCooldownUntil: 0,
       adPlaying: false,
       adCooldownMs: 60000,
@@ -219,13 +241,14 @@
     const scoreEl = document.getElementById('score');
     const adBtn = document.getElementById('adBtn');
     const resetBtn = document.getElementById('resetBtn');
+    const shareBtn = document.getElementById('shareBtn');
     const toastEl = document.getElementById('toast');
     const tabs = document.querySelectorAll('.tab');
     const panelBubbles = document.getElementById('panel-bubbles');
     const panelSlime = document.getElementById('panel-slime');
 
     /* =========================================================
-       AUDIO (synth, no files)
+       AUDIO
        ========================================================= */
     let audioCtx = null;
     function beep(freqStart, freqEnd, dur, gainVal = 0.15, type = 'sine') {
@@ -243,7 +266,7 @@
         osc.start(t); osc.stop(t + dur + 0.02);
       } catch (e) {}
     }
-    const playPop = () => beep(600 + Math.random()*300, 120, 0.1, 0.15);
+    const playPop = () => beep(600 + Math.random() * 300, 120, 0.1, 0.15);
     const playSquish = () => beep(300, 80, 0.12, 0.12, 'triangle');
 
     function haptic(type = 'light') {
@@ -258,7 +281,7 @@
       toastEl.textContent = msg;
       toastEl.classList.add('show');
       clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2400);
     }
 
     /* =========================================================
@@ -314,17 +337,15 @@
 
     const slime = {
       cx: 150, cy: 150, baseR: 70,
-      pullX: 0, pullY: 0,          // current finger offset
-      targetX: 0, targetY: 0,      // target finger offset
+      pullX: 0, pullY: 0,
+      targetX: 0, targetY: 0,
       velX: 0, velY: 0,
       dragging: false,
       raf: null,
-      stretchScore: 0,
       squishPlayed: false,
     };
 
     function slimeLoop() {
-      // Spring physics: pull eases toward target, then springs back
       const stiffness = slime.dragging ? 0.25 : 0.08;
       const damping = slime.dragging ? 0.75 : 0.82;
       slime.velX = (slime.velX + (slime.targetX - slime.pullX) * stiffness) * damping;
@@ -334,7 +355,6 @@
 
       drawSlime();
 
-      // Track stretch score
       const dist = Math.hypot(slime.pullX, slime.pullY);
       if (dist > 40 && !slime.squishPlayed) {
         slime.squishPlayed = true;
@@ -351,12 +371,9 @@
       const { cx, cy, baseR, pullX, pullY } = slime;
       const d = Math.hypot(pullX, pullY);
       const angle = Math.atan2(pullY, pullX);
-      // Stretch factor based on pull distance
       const stretch = Math.min(1.8, 1 + d / 200);
       const squash = 1 / stretch;
 
-      // Build an organic blob using cubic beziers around the circle
-      // and pulling the nose toward the finger.
       const noseX = cx + Math.cos(angle) * (baseR * stretch);
       const noseY = cy + Math.sin(angle) * (baseR * stretch);
       const backX = cx - Math.cos(angle) * (baseR * squash * 0.9);
@@ -371,7 +388,6 @@
       const s2x = cx - perpX * sideOffset;
       const s2y = cy - perpY * sideOffset;
 
-      // Control points
       const c1x = (noseX + s1x) / 2 + perpX * baseR * 0.6;
       const c1y = (noseY + s1y) / 2 + perpY * baseR * 0.6;
       const c2x = (noseX + s2x) / 2 - perpX * baseR * 0.6;
@@ -396,7 +412,6 @@
       slime.targetX = 0; slime.targetY = 0;
       slime.velX = 0; slime.velY = 0;
       slime.dragging = false;
-      slime.stretchScore = 0;
       if (!slime.raf) slime.raf = requestAnimationFrame(slimeLoop);
     }
 
@@ -406,7 +421,6 @@
       const y = ((e.clientY - rect.top) / rect.height) * 300;
       const dx = x - slime.cx;
       const dy = y - slime.cy;
-      // Clamp stretch
       const maxPull = 90;
       const dist = Math.hypot(dx, dy);
       const f = dist > maxPull ? maxPull / dist : 1;
@@ -463,7 +477,7 @@
         return;
       }
       const label = state.mode === 'bubbles' ? 'bubble skin' : 'slime skin';
-      adBtn.textContent = `🎁 Unlock ${next} ${label}`;
+      adBtn.textContent = `🎁 Unlock ${next}`;
       adBtn.disabled = false;
     }
 
@@ -480,9 +494,8 @@
 
     /* =========================================================
        MONETAG REWARDED INTERSTITIAL
-       --------------------------------------------------------
        SDK function: show_12162761
-       Reward verified via result.reward_event_type === 'valued'
+       Reward fires directly on Promise resolve (official pattern).
        ========================================================= */
     async function watchRewardedAd() {
       if (state.adPlaying) return;
@@ -499,35 +512,114 @@
       updateAdButton();
 
       try {
-        // Preload for instant display
         try { await showAd({ type: 'preload' }); } catch (e) {}
 
-await showAd();
+        await showAd();
 
-// Monetag's SDK resolves the Promise after the ad ends.
-// The official integration pattern rewards directly on resolve.
-if (state.mode === 'bubbles') {
-    const skin = nextLocked('bubbles');
-    if (skin) {
-        state.bubbleUnlocked.add(skin);
-        applyBubbleSkin(skin);
-        showToast(`Bubble skin "${skin}" unlocked ✨`);
-    }
-} else {
-    const skin = nextLocked('slime');
-    if (skin) {
-        state.slimeUnlocked.add(skin);
-        applySlimeSkin(skin);
-        showToast(`Slime skin "${skin}" unlocked ✨`);
-    }
-}
-state.adCooldownUntil = Date.now() + state.adCooldownMs;
+        // Reward directly (Monetag SDK resolves after ad ends)
+        if (state.mode === 'bubbles') {
+          const skin = nextLocked('bubbles');
+          if (skin) {
+            state.bubbleUnlocked.add(skin);
+            applyBubbleSkin(skin);
+            showToast(`Bubble skin "${skin}" unlocked ✨`);
+          }
+        } else {
+          const skin = nextLocked('slime');
+          if (skin) {
+            state.slimeUnlocked.add(skin);
+            applySlimeSkin(skin);
+            showToast(`Slime skin "${skin}" unlocked ✨`);
+          }
+        }
+        state.adCooldownUntil = Date.now() + state.adCooldownMs;
       } catch (err) {
         console.error('[PopZen] Ad error:', err);
         showToast('Ad unavailable, try later');
       } finally {
         state.adPlaying = false;
         updateAdButton();
+      }
+    }
+
+    /* =========================================================
+       SHARE FEATURE
+       ========================================================= */
+    function shareApp() {
+      const botUsername = 'PopZenPlayBot';
+      const shareText = `🫧 I'm hooked on PopZen — pop bubbles & stretch slime to relax. Try it!`;
+      const shareUrl = `https://t.me/${botUsername}/play`;
+
+      if (tg && tg.openTelegramLink) {
+        const shareLink =
+          `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}` +
+          `&text=${encodeURIComponent(shareText)}`;
+        tg.openTelegramLink(shareLink);
+      } else if (navigator.share) {
+        navigator.share({ title: 'PopZen', text: shareText, url: shareUrl }).catch(() => {});
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(shareText + '\n' + shareUrl)
+          .then(() => showToast('Link copied! Paste it anywhere 📋'))
+          .catch(() => showToast('Could not share'));
+      } else {
+        showToast('Sharing not available');
+      }
+    }
+    shareBtn.addEventListener('click', shareApp);
+
+    /* =========================================================
+       DAILY STREAK SYSTEM
+       ========================================================= */
+    function checkStreak() {
+      const today = new Date().toISOString().slice(0, 10);
+      const last = localStorage.getItem('popzen_lastOpen');
+      let streak = parseInt(localStorage.getItem('popzen_streak') || '0', 10);
+
+      if (last === today) {
+        // Already opened today
+      } else if (last) {
+        const diffDays = Math.round(
+          (new Date(today) - new Date(last)) / 86400000
+        );
+        streak = diffDays === 1 ? streak + 1 : 1;
+      } else {
+        streak = 1;
+      }
+
+      localStorage.setItem('popzen_lastOpen', today);
+      localStorage.setItem('popzen_streak', String(streak));
+
+      const banner = document.getElementById('streakBanner');
+      const countEl = document.getElementById('streakCount');
+      const rewardEl = document.getElementById('streakReward');
+      banner.style.display = 'flex';
+      countEl.textContent = streak;
+
+      // Milestone free-skin unlocks
+      const milestones = { 3: 'glitter', 7: 'neon', 14: 'lava' };
+      let rewardMsg = '';
+      const milestoneSkin = milestones[streak];
+      if (milestoneSkin) {
+        if (state.bubbleSkins.includes(milestoneSkin) && !state.bubbleUnlocked.has(milestoneSkin)) {
+          state.bubbleUnlocked.add(milestoneSkin);
+          applyBubbleSkin(milestoneSkin);
+          rewardMsg = `🎁 Free "${milestoneSkin}" bubble skin!`;
+        } else if (state.slimeSkins.includes(milestoneSkin) && !state.slimeUnlocked.has(milestoneSkin)) {
+          state.slimeUnlocked.add(milestoneSkin);
+          applySlimeSkin(milestoneSkin);
+          rewardMsg = `🎁 Free "${milestoneSkin}" slime skin!`;
+        }
+      }
+
+      if (rewardMsg) {
+        rewardEl.textContent = rewardMsg;
+        showToast(rewardMsg);
+        updateAdButton();
+      } else {
+        const next = streak < 3 ? 3 : streak < 7 ? 7 : streak < 14 ? 14 : null;
+        rewardEl.textContent = next
+          ? `${next - streak} day${next - streak > 1 ? 's' : ''} to free skin`
+          : '🔥 Max streak!';
       }
     }
 
@@ -545,6 +637,7 @@ state.adCooldownUntil = Date.now() + state.adCooldownMs;
     applyBubbleSkin('default');
     applySlimeSkin('default');
     resetSlime();
+    checkStreak();
     updateAdButton();
   </script>
 </body>
