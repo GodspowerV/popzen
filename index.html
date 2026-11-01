@@ -34,12 +34,31 @@
       background: linear-gradient(90deg, #ff6bcb, #8a7bff, #4facfe);
       -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
     }
+    .header-right { display: flex; gap: 8px; align-items: center; }
+    .best-box {
+      background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.35);
+      border-radius: 12px; padding: 6px 12px; font-size: 14px; font-weight: 700;
+      color: #ffd700; text-align: center;
+    }
     .score-box {
       background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
       border-radius: 12px; padding: 6px 14px; font-size: 15px; font-weight: 600;
       min-width: 90px; text-align: center;
     }
     .score-box span { color: #8a7bff; }
+
+    /* Trap vision indicator */
+    #trapVisionBar {
+      display: none;
+      background: linear-gradient(90deg, rgba(255,80,80,0.3), rgba(255,160,0,0.3));
+      border: 1px solid rgba(255,120,80,0.6);
+      border-radius: 12px; padding: 8px 14px;
+      font-size: 14px; font-weight: 700; margin-bottom: 10px;
+      text-align: center; color: #ffcc99;
+      animation: tvPulse 1s infinite;
+    }
+    #trapVisionBar.active { display: block; }
+    @keyframes tvPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
 
     /* Streak banner */
     .streak-banner {
@@ -89,17 +108,40 @@
     .bubble.c3 { background: radial-gradient(circle at 30% 30%, #a8edea, #28c7a8); }
     .bubble.c4 { background: radial-gradient(circle at 30% 30%, #d4a5ff, #8a2be2); }
     .bubble.c5 { background: radial-gradient(circle at 30% 30%, #ffd1ff, #ff6bcb); }
-    body.skin-glitter .bubble {
+
+    /* Skins must NOT affect traps */
+    body.skin-glitter .bubble:not(.trap.visible) {
       background-image:
         radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9) 0%, transparent 40%),
         repeating-conic-gradient(from 0deg, rgba(255,255,255,0.35) 0deg 10deg, transparent 10deg 20deg);
       background-blend-mode: overlay;
     }
-    body.skin-neon .bubble {
+    body.skin-neon .bubble:not(.trap.visible) {
       box-shadow: 0 0 14px 2px currentColor,
                   inset -3px -3px 8px rgba(0,0,0,0.25),
                   inset 3px 3px 8px rgba(255,255,255,0.35);
     }
+
+    /* Traps — hidden by default, visible only with trap vision */
+    .bubble.trap { pointer-events: auto; }
+    .bubble.trap.visible {
+      background: radial-gradient(circle at 35% 30%, #ff6b6b, #c0392b) !important;
+      box-shadow: 0 0 16px 3px rgba(255,60,60,0.8),
+                  inset -3px -3px 8px rgba(0,0,0,0.3),
+                  inset 3px 3px 8px rgba(255,255,255,0.25) !important;
+      animation: trapPulse 0.9s infinite;
+    }
+    .bubble.trap.visible::after {
+      content: '💥';
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 60%; 
+    }
+    @keyframes trapPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(0.92); }
+    }
+    .bubble.trap.fading { opacity: 0; transform: scale(0.4); transition: opacity 0.3s, transform 0.3s; }
 
     /* ===== SLIME ===== */
     #slimeWrap {
@@ -130,16 +172,20 @@
     }
     button:active { transform: scale(0.97); }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
-    #resetBtn { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); flex: 0.8; }
     #shareBtn {
       background: rgba(79,172,254,0.25);
       border: 1px solid rgba(79,172,254,0.5);
-      flex: 0.8;
+      flex: 0.7;
     }
     #adBtn {
       background: linear-gradient(90deg, #ff6bcb, #8a7bff);
       box-shadow: 0 4px 16px rgba(138,123,255,0.4);
-      flex: 1.4;
+      flex: 1.3;
+    }
+    #adBtn.tv-active {
+      background: linear-gradient(90deg, #ff6b3d, #ff3d6b);
+      box-shadow: 0 4px 16px rgba(255,80,60,0.5);
+      animation: tvPulse 1s infinite;
     }
 
     #toast {
@@ -151,14 +197,50 @@
       max-width: 90vw; text-align: center;
     }
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* Overlays */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      display: none; align-items: center; justify-content: center;
+      z-index: 20; backdrop-filter: blur(6px);
+    }
+    .overlay.show { display: flex; }
+    .overlay-card {
+      background: linear-gradient(160deg, #1e2a4a, #16213e);
+      border: 1px solid rgba(138,123,255,0.5);
+      border-radius: 24px; padding: 32px 28px; text-align: center;
+      max-width: 320px; width: 85%;
+      animation: cardPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    }
+    @keyframes cardPop {
+      0% { transform: scale(0.5); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .overlay-emoji { font-size: 56px; margin-bottom: 12px; }
+    .overlay-title { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+    .overlay-title.record { color: #ffd700; }
+    .overlay-title.gameover { color: #ff6b6b; }
+    .overlay-sub { font-size: 15px; opacity: 0.8; margin-bottom: 24px; }
+    .overlay-btn {
+      background: linear-gradient(90deg, #8a7bff, #4facfe);
+      box-shadow: 0 4px 16px rgba(138,123,255,0.5);
+      font-size: 16px; padding: 14px; width: 100%;
+    }
   </style>
 </head>
 <body>
   <div id="app">
     <header>
       <div class="title">PopZen</div>
-      <div class="score-box">Score: <span id="score">0</span></div>
+      <div class="header-right">
+        <div class="best-box">Best: <span id="best">0</span></div>
+        <div class="score-box">Score: <span id="score">0</span></div>
+      </div>
     </header>
+
+    <!-- Trap vision countdown -->
+    <div id="trapVisionBar">👁️ Trap Vision — <span id="trapVisionSecs">0</span>s</div>
 
     <!-- Daily streak banner (shown by JS) -->
     <div id="streakBanner" class="streak-banner" style="display:none;">
@@ -202,13 +284,32 @@
     </div>
 
     <div class="footer">
-      <button id="resetBtn">Reset</button>
       <button id="shareBtn">📤 Share</button>
       <button id="adBtn">🎁 Unlock</button>
     </div>
   </div>
 
   <div id="toast"></div>
+
+  <!-- Record overlay -->
+  <div id="recordOverlay" class="overlay">
+    <div class="overlay-card">
+      <div class="overlay-emoji">🏆</div>
+      <div class="overlay-title record">New Record!</div>
+      <div class="overlay-sub">You scored <span id="recordScore">0</span> — amazing!</div>
+      <button class="overlay-btn" id="recordClose">Keep popping</button>
+    </div>
+  </div>
+
+  <!-- Game over overlay -->
+  <div id="gameOverOverlay" class="overlay">
+    <div class="overlay-card">
+      <div class="overlay-emoji">💥</div>
+      <div class="overlay-title gameover">Boom! Trap hit</div>
+      <div class="overlay-sub">You scored <span id="finalScore">0</span></div>
+      <button class="overlay-btn" id="restartBtn">Play again</button>
+    </div>
+  </div>
 
   <script>
     /* =========================================================
@@ -223,6 +324,7 @@
     const state = {
       mode: 'bubbles',
       score: 0,
+      bestScore: parseInt(localStorage.getItem('popzen_best') || '0', 10),
       bubbleSkins: ['default', 'glitter', 'neon'],
       bubbleUnlocked: new Set(['default']),
       bubbleActive: 'default',
@@ -232,6 +334,9 @@
       adCooldownUntil: 0,
       adPlaying: false,
       adCooldownMs: 60000,
+      trapVisionUntil: 0,
+      gameOver: false,
+      recordShownThisGame: false,
     };
 
     /* =========================================================
@@ -239,13 +344,19 @@
        ========================================================= */
     const gridEl = document.getElementById('grid');
     const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
     const adBtn = document.getElementById('adBtn');
-    const resetBtn = document.getElementById('resetBtn');
     const shareBtn = document.getElementById('shareBtn');
     const toastEl = document.getElementById('toast');
     const tabs = document.querySelectorAll('.tab');
     const panelBubbles = document.getElementById('panel-bubbles');
     const panelSlime = document.getElementById('panel-slime');
+    const trapVisionBar = document.getElementById('trapVisionBar');
+    const trapVisionSecs = document.getElementById('trapVisionSecs');
+    const recordOverlay = document.getElementById('recordOverlay');
+    const gameOverOverlay = document.getElementById('gameOverOverlay');
+
+    bestEl.textContent = state.bestScore;
 
     /* =========================================================
        AUDIO
@@ -268,6 +379,15 @@
     }
     const playPop = () => beep(600 + Math.random() * 300, 120, 0.1, 0.15);
     const playSquish = () => beep(300, 80, 0.12, 0.12, 'triangle');
+    const playTrap = () => {
+      beep(200, 50, 0.3, 0.25, 'sawtooth');
+      setTimeout(() => beep(150, 40, 0.25, 0.2, 'square'), 80);
+    };
+    const playRecord = () => {
+      [523, 659, 784, 1047].forEach((f, i) =>
+        setTimeout(() => beep(f, f * 1.01, 0.15, 0.18), i * 100)
+      );
+    };
 
     function haptic(type = 'light') {
       try { tg?.HapticFeedback?.impactOccurred(type); } catch (e) {}
@@ -293,6 +413,8 @@
       panelBubbles.classList.toggle('active', mode === 'bubbles');
       panelSlime.classList.toggle('active', mode === 'slime');
       state.score = 0;
+      state.gameOver = false;
+      state.recordShownThisGame = false;
       scoreEl.textContent = '0';
       if (mode === 'bubbles') buildGrid();
       else resetSlime();
@@ -304,29 +426,152 @@
        BUBBLES MODE
        ========================================================= */
     const GRID_COUNT = 36;
+
+    function trapRateForScore(score) {
+      if (score <= 10) return 0.08;
+      if (score <= 25) return 0.15;
+      if (score <= 50) return 0.22;
+      return 0.30;
+    }
+
     function buildGrid() {
       gridEl.innerHTML = '';
-      state.score = 0;
-      scoreEl.textContent = '0';
+      state.gameOver = false;
+      state.recordShownThisGame = false;
+
+      // Determine trap count — never all traps, always at least 1 trap, always ≥5 safe
+      const rate = trapRateForScore(state.score);
+      let trapCount = Math.round(GRID_COUNT * rate);
+      trapCount = Math.max(1, Math.min(GRID_COUNT - 5, trapCount));
+
+      // Pick trap indices
+      const indices = Array.from({ length: GRID_COUNT }, (_, i) => i);
+      for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+      }
+      const trapSet = new Set(indices.slice(0, trapCount));
+
       for (let i = 0; i < GRID_COUNT; i++) {
         const b = document.createElement('div');
         const colorIdx = Math.floor(Math.random() * 6);
         b.className = `bubble c${colorIdx}`;
+        if (trapSet.has(i)) {
+          b.classList.add('trap');
+          b.dataset.trap = '1';
+        }
         const scale = 0.85 + Math.random() * 0.25;
         b.style.transform = `scale(${scale})`;
-        b.addEventListener('pointerdown', () => popBubble(b));
+        b.addEventListener('pointerdown', () => handleBubbleClick(b));
         gridEl.appendChild(b);
       }
+
+      refreshTrapVisibility();
     }
-    function popBubble(el) {
-      if (el.classList.contains('popped')) return;
+
+    function handleBubbleClick(el) {
+      if (state.gameOver) return;
+      if (el.classList.contains('popped') || el.classList.contains('fading')) return;
+
+      if (el.classList.contains('trap')) {
+        // Trap — only triggers if it's actually a trap
+        playTrap();
+        haptic('heavy');
+        state.gameOver = true;
+        document.getElementById('finalScore').textContent = state.score;
+        gameOverOverlay.classList.add('show');
+        return;
+      }
+
+      // Safe bubble
       el.classList.add('popped');
-      state.score++;
-      scoreEl.textContent = state.score;
       playPop();
       haptic('light');
-      if (state.score === GRID_COUNT) showToast('All popped! 🎉');
+      setScore(state.score + 1);
+
+      // Check if all safe bubbles popped
+      checkGridCleared();
     }
+
+    function checkGridCleared() {
+      const remainingSafe = gridEl.querySelectorAll('.bubble:not(.trap):not(.popped)');
+      if (remainingSafe.length === 0) {
+        // Fade out traps
+        gridEl.querySelectorAll('.bubble.trap:not(.fading)').forEach(t => {
+          t.classList.add('fading');
+        });
+        showToast('Grid cleared! 🎉');
+        setTimeout(() => {
+          if (!state.gameOver) buildGrid();
+        }, 500);
+      }
+    }
+
+    function setScore(v) {
+      state.score = v;
+      scoreEl.textContent = v;
+
+      // Record check (once per game session)
+      if (v > state.bestScore && !state.recordShownThisGame) {
+        state.recordShownThisGame = true;
+        state.bestScore = v;
+        bestEl.textContent = v;
+        localStorage.setItem('popzen_best', String(v));
+        playRecord();
+        haptic('medium');
+        document.getElementById('recordScore').textContent = v;
+        recordOverlay.classList.add('show');
+      } else if (v > state.bestScore) {
+        // Update best silently if record already shown
+        state.bestScore = v;
+        bestEl.textContent = v;
+        localStorage.setItem('popzen_best', String(v));
+      }
+    }
+
+    /* =========================================================
+       TRAP VISION
+       ========================================================= */
+    function trapVisionActive() {
+      return Date.now() < state.trapVisionUntil;
+    }
+
+    function grantTrapVision(ms) {
+      state.trapVisionUntil = Date.now() + ms;
+      refreshTrapVisibility();
+      updateTrapVisionUI();
+    }
+
+    function refreshTrapVisibility() {
+      const active = trapVisionActive();
+      gridEl.querySelectorAll('.bubble.trap').forEach(el => {
+        el.classList.toggle('visible', active);
+      });
+    }
+
+    function updateTrapVisionUI() {
+      const remaining = state.trapVisionUntil - Date.now();
+      if (remaining > 0) {
+        trapVisionBar.classList.add('active');
+        trapVisionSecs.textContent = Math.ceil(remaining / 1000);
+        adBtn.classList.add('tv-active');
+      } else {
+        trapVisionBar.classList.remove('active');
+        adBtn.classList.remove('tv-active');
+      }
+    }
+
+    // Countdown ticker
+    setInterval(() => {
+      if (state.trapVisionUntil > 0) {
+        updateTrapVisionUI();
+        if (!trapVisionActive()) {
+          state.trapVisionUntil = 0;
+          refreshTrapVisibility();
+          updateAdButton();
+        }
+      }
+    }, 500);
 
     /* =========================================================
        SLIME MODE
@@ -428,8 +673,7 @@
       slime.targetY = dy * f;
       const currentDist = Math.hypot(slime.targetX, slime.targetY);
       if (currentDist > state.score) {
-        state.score = Math.floor(currentDist);
-        scoreEl.textContent = state.score;
+        setScore(Math.floor(currentDist));
       }
     }
 
@@ -476,8 +720,7 @@
         setTimeout(updateAdButton, 500);
         return;
       }
-      const label = state.mode === 'bubbles' ? 'bubble skin' : 'slime skin';
-      adBtn.textContent = `🎁 Unlock ${next}`;
+      adBtn.textContent = `🎁 Unlock ${next} + 👁️ 60s`;
       adBtn.disabled = false;
     }
 
@@ -495,7 +738,7 @@
     /* =========================================================
        MONETAG REWARDED INTERSTITIAL
        SDK function: show_12162761
-       Reward fires directly on Promise resolve (official pattern).
+       Reward fires directly on Promise resolve.
        ========================================================= */
     async function watchRewardedAd() {
       if (state.adPlaying) return;
@@ -504,7 +747,7 @@
       const showAd = window.show_12162761;
       if (typeof showAd !== 'function') {
         showToast('Ad SDK not loaded');
-        console.warn('[PopZen] show_12162761 not found. Check the Monetag <script> tag.');
+        console.warn('[PopZen] show_12162761 not found.');
         return;
       }
 
@@ -516,23 +759,30 @@
 
         await showAd();
 
-        // Reward directly (Monetag SDK resolves after ad ends)
+        // Reward: unlock next skin AND grant 60s trap vision
+        let unlockedSkin = null;
         if (state.mode === 'bubbles') {
-          const skin = nextLocked('bubbles');
-          if (skin) {
-            state.bubbleUnlocked.add(skin);
-            applyBubbleSkin(skin);
-            showToast(`Bubble skin "${skin}" unlocked ✨`);
+          unlockedSkin = nextLocked('bubbles');
+          if (unlockedSkin) {
+            state.bubbleUnlocked.add(unlockedSkin);
+            applyBubbleSkin(unlockedSkin);
           }
         } else {
-          const skin = nextLocked('slime');
-          if (skin) {
-            state.slimeUnlocked.add(skin);
-            applySlimeSkin(skin);
-            showToast(`Slime skin "${skin}" unlocked ✨`);
+          unlockedSkin = nextLocked('slime');
+          if (unlockedSkin) {
+            state.slimeUnlocked.add(unlockedSkin);
+            applySlimeSkin(unlockedSkin);
           }
         }
+
+        grantTrapVision(60000);
         state.adCooldownUntil = Date.now() + state.adCooldownMs;
+
+        if (unlockedSkin) {
+          showToast(`"${unlockedSkin}" skin + 👁️ 60s Trap Vision!`);
+        } else {
+          showToast('👁️ 60s Trap Vision granted!');
+        }
       } catch (err) {
         console.error('[PopZen] Ad error:', err);
         showToast('Ad unavailable, try later');
@@ -547,18 +797,20 @@
        ========================================================= */
     function shareApp() {
       const botUsername = 'PopZenPlayBot';
-      const shareText = `🫧 I'm hooked on PopZen — pop bubbles & stretch slime to relax. Try it!`;
+      const scoreText = state.score > 0
+        ? `I scored ${state.score} on PopZen! Beat me →`
+        : `🫧 I'm hooked on PopZen — pop bubbles & stretch slime to relax. Try it!`;
       const shareUrl = `https://t.me/${botUsername}/play`;
 
       if (tg && tg.openTelegramLink) {
         const shareLink =
           `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}` +
-          `&text=${encodeURIComponent(shareText)}`;
+          `&text=${encodeURIComponent(scoreText)}`;
         tg.openTelegramLink(shareLink);
       } else if (navigator.share) {
-        navigator.share({ title: 'PopZen', text: shareText, url: shareUrl }).catch(() => {});
+        navigator.share({ title: 'PopZen', text: scoreText, url: shareUrl }).catch(() => {});
       } else if (navigator.clipboard) {
-        navigator.clipboard.writeText(shareText + '\n' + shareUrl)
+        navigator.clipboard.writeText(scoreText + '\n' + shareUrl)
           .then(() => showToast('Link copied! Paste it anywhere 📋'))
           .catch(() => showToast('Could not share'));
       } else {
@@ -568,7 +820,30 @@
     shareBtn.addEventListener('click', shareApp);
 
     /* =========================================================
+       OVERLAY HANDLERS
+       ========================================================= */
+    document.getElementById('recordClose').addEventListener('click', () => {
+      recordOverlay.classList.remove('show');
+    });
+
+    function restartGame() {
+      gameOverOverlay.classList.remove('show');
+      state.score = 0;
+      state.gameOver = false;
+      state.recordShownThisGame = false;
+      scoreEl.textContent = '0';
+      if (state.mode === 'bubbles') {
+        buildGrid();
+      } else {
+        resetSlime();
+      }
+    }
+    document.getElementById('restartBtn').addEventListener('click', restartGame);
+
+    /* =========================================================
        DAILY STREAK SYSTEM
+       Milestones grant FREE SKINS only. NEVER trap vision.
+       Trap vision is AD-ONLY (see watchRewardedAd above).
        ========================================================= */
     function checkStreak() {
       const today = new Date().toISOString().slice(0, 10);
@@ -595,7 +870,7 @@
       banner.style.display = 'flex';
       countEl.textContent = streak;
 
-      // Milestone free-skin unlocks
+      // Milestone free-skin unlocks (NO trap vision here — AD-ONLY)
       const milestones = { 3: 'glitter', 7: 'neon', 14: 'lava' };
       let rewardMsg = '';
       const milestoneSkin = milestones[streak];
@@ -626,13 +901,11 @@
     /* =========================================================
        WIRE UP
        ========================================================= */
-    resetBtn.addEventListener('click', () => {
-      if (state.mode === 'bubbles') buildGrid();
-      else { resetSlime(); state.score = 0; scoreEl.textContent = '0'; }
-    });
     adBtn.addEventListener('click', watchRewardedAd);
 
-    // init
+    /* =========================================================
+       INIT SEQUENCE
+       ========================================================= */
     buildGrid();
     applyBubbleSkin('default');
     applySlimeSkin('default');
