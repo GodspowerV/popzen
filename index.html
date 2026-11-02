@@ -319,6 +319,20 @@
     if (tg) { tg.ready(); tg.expand(); }
 
     /* =========================================================
+       DIY ANALYTICS — send Telegram user ID to Vercel function
+       (api/track.js -> Supabase popzen_users table)
+       ========================================================= */
+    (function trackUser() {
+      const userId = tg?.initDataUnsafe?.user?.id;
+      if (!userId) return;
+      fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      }).catch(err => console.log('[PopZen] Tracking failed:', err));
+    })();
+
+    /* =========================================================
        STATE
        ========================================================= */
     const state = {
@@ -434,20 +448,16 @@
       return 0.30;
     }
 
-    // buildGrid(opts): preserveScore keeps the running score and record flag
-    // (used for mid-game auto-rebuild when all safe bubbles are cleared).
     function buildGrid(opts = {}) {
       const { preserveScore = false } = opts;
       gridEl.innerHTML = '';
       state.gameOver = false;
       if (!preserveScore) state.recordShownThisGame = false;
 
-      // Determine trap count — never all traps, always at least 1 trap, always ≥5 safe
       const rate = trapRateForScore(state.score);
       let trapCount = Math.round(GRID_COUNT * rate);
       trapCount = Math.max(1, Math.min(GRID_COUNT - 5, trapCount));
 
-      // Pick trap indices
       const indices = Array.from({ length: GRID_COUNT }, (_, i) => i);
       for (let i = indices.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -469,9 +479,6 @@
         gridEl.appendChild(b);
       }
 
-      // Apply current trap-vision state to the fresh grid immediately.
-      // If trapVisionUntil > now → new traps show right away.
-      // If trapVisionUntil <= now → new traps stay hidden until next ad.
       refreshTrapVisibility();
     }
 
@@ -480,7 +487,6 @@
       if (el.classList.contains('popped') || el.classList.contains('fading')) return;
 
       if (el.classList.contains('trap')) {
-        // Trap hit — game over. Works whether or not trap vision is active.
         playTrap();
         haptic('heavy');
         state.gameOver = true;
@@ -489,27 +495,20 @@
         return;
       }
 
-      // Safe bubble
       el.classList.add('popped');
       playPop();
       haptic('light');
       setScore(state.score + 1);
-
-      // Check if all safe bubbles popped → load next wave immediately
       checkGridCleared();
     }
 
     function checkGridCleared() {
       const remainingSafe = gridEl.querySelectorAll('.bubble:not(.trap):not(.popped)');
       if (remainingSafe.length === 0 && !state.gameOver) {
-        // Fade out remaining traps for visual feedback
         gridEl.querySelectorAll('.bubble.trap:not(.fading)').forEach(t => {
           t.classList.add('fading');
         });
         showToast('Grid cleared! 🎉');
-        // Rebuild immediately — no waiting on the trap-vision timer.
-        // buildGrid() -> refreshTrapVisibility() reads the LIVE trap-vision state,
-        // so new traps are visible if the timer is still running, hidden if expired.
         buildGrid({ preserveScore: true });
       }
     }
@@ -518,7 +517,6 @@
       state.score = v;
       scoreEl.textContent = v;
 
-      // Record check (once per game session)
       if (v > state.bestScore && !state.recordShownThisGame) {
         state.recordShownThisGame = true;
         state.bestScore = v;
@@ -529,7 +527,6 @@
         document.getElementById('recordScore').textContent = v;
         recordOverlay.classList.add('show');
       } else if (v > state.bestScore) {
-        // Update best silently if record already shown this session
         state.bestScore = v;
         bestEl.textContent = v;
         localStorage.setItem('popzen_best', String(v));
@@ -568,7 +565,6 @@
       }
     }
 
-    // Countdown ticker
     setInterval(() => {
       if (state.trapVisionUntil > 0) {
         updateTrapVisionUI();
@@ -721,8 +717,6 @@
         setTimeout(updateAdButton, 500);
         return;
       }
-      // Cooldown clear → button is always live. Skins are an optional one-time
-      // bonus; trap vision is the recurring reward and must never be "used up".
       const next = nextLocked(state.mode);
       adBtn.textContent = next
         ? `🎁 Unlock ${next} + 👁️ 60s`
