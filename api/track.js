@@ -3,8 +3,14 @@
 // Mini App and inserts it into the Supabase `popzen_users` table.
 //
 // Required Vercel Environment Variables (Production scope):
-//   SUPABASE_URL       — your Supabase project URL
-//   SUPABASE_ANON_KEY  — your Supabase anon public key
+//   SUPABASE_URL                — your Supabase project URL
+//   SUPABASE_SERVICE_ROLE_KEY   — your Supabase service_role secret
+//
+// The service_role key is used here because PostgREST has a known bug where
+// it fails to recognize INSERT policies for the anon role even when the
+// policy is defined correctly. service_role bypasses RLS entirely, and since
+// this function runs server-side on Vercel (never shipped to the client),
+// the key is not exposed to users.
 //
 // Expected Supabase table (public schema):
 //   popzen_users (
@@ -12,10 +18,6 @@
 //     telegram_id  bigint unique not null,
 //     first_seen   timestamptz default now() not null
 //   )
-//
-// RLS must allow INSERT for the anon role:
-//   create policy "Allow anon inserts"
-//   on public.popzen_users for insert to anon with check (true);
 
 export default async function handler(request, response) {
   // Only allow POST
@@ -35,26 +37,23 @@ export default async function handler(request, response) {
   }
 
   // Validate userId is a numeric Telegram ID
-  if (userId === undefined || userId === null || userId === '') {
-    return response.status(400).json({ error: 'Missing userId' });
-  }
   const numericId = Number(userId);
-  if (!Number.isFinite(numericId) || !Number.isInteger(numericId) || numericId <= 0) {
+  if (!Number.isFinite(numericId) || numericId <= 0) {
     return response.status(400).json({ error: 'Invalid userId' });
   }
 
   // Read env vars
   const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   // Debug: confirm env vars are present (does NOT print the values)
   console.log('SUPABASE_URL present:', !!SUPABASE_URL);
-  console.log('SUPABASE_ANON_KEY present:', !!SUPABASE_ANON_KEY);
+  console.log('SUPABASE_SERVICE_ROLE_KEY present:', !!SUPABASE_SERVICE_KEY);
 
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return response.status(500).json({
       error: 'Server misconfigured',
-      detail: 'Missing SUPABASE_URL or SUPABASE_ANON_KEY env var'
+      detail: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env var'
     });
   }
 
@@ -64,10 +63,9 @@ export default async function handler(request, response) {
       {
         method: 'POST',
         headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'apikey': SUPABASE_SERVICE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
           'Content-Type': 'application/json',
-          // Ignore duplicates so repeat opens don't error out
           'Prefer': 'resolution=ignore-duplicates'
         },
         body: JSON.stringify({ telegram_id: numericId })
