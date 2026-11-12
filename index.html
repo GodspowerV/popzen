@@ -143,23 +143,59 @@
     }
     .bubble.trap.fading { opacity: 0; transform: scale(0.4); transition: opacity 0.3s, transform 0.3s; }
 
-    /* ===== SLIME ===== */
-    #slimeWrap {
-      flex: 1; display: flex; align-items: center; justify-content: center;
-      position: relative; touch-action: none; cursor: grab;
+    /* ===== LEADERBOARD ===== */
+    #leaderboardWrap {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
     }
-    #slimeWrap:active { cursor: grabbing; }
-    #slimeSvg { width: 100%; height: 100%; max-height: 420px; }
-    #slimeBody {
-      fill: url(#slimeGrad);
-      filter: drop-shadow(0 8px 20px rgba(138,123,255,0.4));
-      transition: fill 0.3s;
+    #leaderboardList {
+      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding-right: 4px;
     }
-    body.slime-glitter #slimeBody { fill: url(#slimeGlitter); }
-    body.slime-lava    #slimeBody { fill: url(#slimeLava); }
-    .slime-hint {
-      position: absolute; bottom: 8px; left: 0; right: 0; text-align: center;
-      font-size: 12px; opacity: 0.55; pointer-events: none;
+    .lb-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; margin-bottom: 6px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      font-size: 14px;
+    }
+    .lb-row.self {
+      background: rgba(138,123,255,0.25);
+      border-color: rgba(138,123,255,0.6);
+    }
+    .lb-row.house {
+      background: rgba(255,215,0,0.1);
+      border-color: rgba(255,215,0,0.4);
+    }
+    .lb-rank {
+      font-weight: 800; min-width: 32px; text-align: center;
+      color: #ffd700;
+    }
+    .lb-name {
+      flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font-weight: 600;
+    }
+    .lb-score {
+      font-weight: 700; color: #8a7bff; min-width: 50px; text-align: right;
+    }
+    .lb-prize {
+      min-width: 50px; text-align: right; font-weight: 700;
+      color: #4ade80; font-size: 12px;
+    }
+    .lb-prize.none { color: rgba(255,255,255,0.35); }
+    .lb-badge {
+      font-size: 10px; padding: 2px 6px; border-radius: 6px;
+      background: rgba(255,215,0,0.2); color: #ffd700; font-weight: 700;
+    }
+    .lb-empty {
+      text-align: center; padding: 40px 20px; opacity: 0.6; font-size: 14px;
+    }
+    .lb-refresh {
+      background: rgba(79,172,254,0.25);
+      border: 1px solid rgba(79,172,254,0.5);
+      border-radius: 12px; padding: 10px;
+      font-size: 13px; font-weight: 600; color: #fff;
+      margin-top: 8px; cursor: pointer; width: 100%;
     }
 
     /* Footer */
@@ -227,6 +263,25 @@
       box-shadow: 0 4px 16px rgba(138,123,255,0.5);
       font-size: 16px; padding: 14px; width: 100%;
     }
+    .overlay-btn.secondary {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      margin-top: 10px; font-size: 14px;
+    }
+
+    /* Channel gate overlay */
+    #gateOverlay {
+      z-index: 30;
+      background: rgba(0,0,0,0.92);
+    }
+    .gate-spinner {
+      width: 32px; height: 32px; margin: 16px auto;
+      border: 3px solid rgba(138,123,255,0.3);
+      border-top-color: #8a7bff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -242,7 +297,7 @@
     <!-- Trap vision countdown -->
     <div id="trapVisionBar">👁️ Trap Vision — <span id="trapVisionSecs">0</span>s</div>
 
-    <!-- Daily streak banner (shown by JS) -->
+    <!-- Daily streak banner -->
     <div id="streakBanner" class="streak-banner" style="display:none;">
       🔥 <span id="streakCount">0</span>-day streak
       <span id="streakReward" class="streak-reward"></span>
@@ -250,7 +305,7 @@
 
     <div class="tabs">
       <div class="tab active" data-mode="bubbles">🫧 Bubbles</div>
-      <div class="tab" data-mode="slime">🟢 Slime</div>
+      <div class="tab" data-mode="leaderboard">🏆 Leaderboard</div>
     </div>
 
     <!-- BUBBLES PANEL -->
@@ -258,28 +313,13 @@
       <div id="grid"></div>
     </div>
 
-    <!-- SLIME PANEL -->
-    <div class="panel" id="panel-slime">
-      <div id="slimeWrap">
-        <svg id="slimeSvg" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid meet">
-          <defs>
-            <radialGradient id="slimeGrad" cx="40%" cy="35%">
-              <stop offset="0%" stop-color="#a8edea"/>
-              <stop offset="100%" stop-color="#28c7a8"/>
-            </radialGradient>
-            <radialGradient id="slimeGlitter" cx="40%" cy="35%">
-              <stop offset="0%" stop-color="#ffd1ff"/>
-              <stop offset="60%" stop-color="#ff6bcb"/>
-              <stop offset="100%" stop-color="#8a2be2"/>
-            </radialGradient>
-            <radialGradient id="slimeLava" cx="40%" cy="35%">
-              <stop offset="0%" stop-color="#fddb92"/>
-              <stop offset="100%" stop-color="#f6416c"/>
-            </radialGradient>
-          </defs>
-          <path id="slimeBody" d=""/>
-        </svg>
-        <div class="slime-hint">Drag the slime to stretch it 🫳</div>
+    <!-- LEADERBOARD PANEL -->
+    <div class="panel" id="panel-leaderboard">
+      <div id="leaderboardWrap">
+        <div id="leaderboardList">
+          <div class="lb-empty">Loading leaderboard…</div>
+        </div>
+        <button class="lb-refresh" id="lbRefreshBtn">🔄 Refresh</button>
       </div>
     </div>
 
@@ -311,6 +351,19 @@
     </div>
   </div>
 
+  <!-- Channel gate overlay -->
+  <div id="gateOverlay" class="overlay">
+    <div class="overlay-card">
+      <div class="overlay-emoji">📢</div>
+      <div class="overlay-title">Join our channel</div>
+      <div class="overlay-sub">You must be a member of our updates channel to play.</div>
+      <div id="gateStatus" style="font-size:13px; opacity:0.8; margin-bottom:20px;">Checking membership…</div>
+      <div class="gate-spinner" id="gateSpinner"></div>
+      <button class="overlay-btn" id="gateJoinBtn" style="display:none;">Join Channel</button>
+      <button class="overlay-btn secondary" id="gateCheckBtn" style="display:none;">I've joined — verify</button>
+    </div>
+  </div>
+
   <script>
     /* =========================================================
        TELEGRAM
@@ -319,18 +372,14 @@
     if (tg) { tg.ready(); tg.expand(); }
 
     /* =========================================================
-       DIY ANALYTICS — send Telegram user ID to Vercel function
-       (api/track.js -> Supabase popzen_users table)
+       CONFIG
        ========================================================= */
-    (function trackUser() {
-      const userId = tg?.initDataUnsafe?.user?.id;
-      if (!userId) return;
-      fetch('/api/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      }).catch(err => console.log('[PopZen] Tracking failed:', err));
-    })();
+    const CHANNEL_URL = 'https://t.me/PopZenUpdates'; // change if your channel username differs
+    const CHANNEL_USERNAME = 'PopZenUpdates';          // without @, or numeric -100… in env
+    const TRAP_VISION_MS = 10000;                      // 10 seconds
+    const AD_COOLDOWN_MS = 10000;                      // 10 seconds
+    const GRID_COUNT = 36;
+    const LEADERBOARD_LIMIT = 50;
 
     /* =========================================================
        STATE
@@ -342,15 +391,17 @@
       bubbleSkins: ['default', 'glitter', 'neon'],
       bubbleUnlocked: new Set(['default']),
       bubbleActive: 'default',
-      slimeSkins: ['default', 'glitter', 'lava'],
-      slimeUnlocked: new Set(['default']),
-      slimeActive: 'default',
       adCooldownUntil: 0,
       adPlaying: false,
-      adCooldownMs: 60000,
+      adCooldownMs: AD_COOLDOWN_MS,
       trapVisionUntil: 0,
       gameOver: false,
       recordShownThisGame: false,
+      telegramUserId: tg?.initDataUnsafe?.user?.id || null,
+      telegramUsername: tg?.initDataUnsafe?.user?.username || null,
+      telegramFirstName: tg?.initDataUnsafe?.user?.first_name || null,
+      verified: false,
+      scoreWritePending: false,
     };
 
     /* =========================================================
@@ -364,11 +415,18 @@
     const toastEl = document.getElementById('toast');
     const tabs = document.querySelectorAll('.tab');
     const panelBubbles = document.getElementById('panel-bubbles');
-    const panelSlime = document.getElementById('panel-slime');
+    const panelLeaderboard = document.getElementById('panel-leaderboard');
     const trapVisionBar = document.getElementById('trapVisionBar');
     const trapVisionSecs = document.getElementById('trapVisionSecs');
     const recordOverlay = document.getElementById('recordOverlay');
     const gameOverOverlay = document.getElementById('gameOverOverlay');
+    const gateOverlay = document.getElementById('gateOverlay');
+    const gateStatus = document.getElementById('gateStatus');
+    const gateSpinner = document.getElementById('gateSpinner');
+    const gateJoinBtn = document.getElementById('gateJoinBtn');
+    const gateCheckBtn = document.getElementById('gateCheckBtn');
+    const leaderboardList = document.getElementById('leaderboardList');
+    const lbRefreshBtn = document.getElementById('lbRefreshBtn');
 
     bestEl.textContent = state.bestScore;
 
@@ -392,7 +450,6 @@
       } catch (e) {}
     }
     const playPop = () => beep(600 + Math.random() * 300, 120, 0.1, 0.15);
-    const playSquish = () => beep(300, 80, 0.12, 0.12, 'triangle');
     const playTrap = () => {
       beep(200, 50, 0.3, 0.25, 'sawtooth');
       setTimeout(() => beep(150, 40, 0.25, 0.2, 'square'), 80);
@@ -419,28 +476,98 @@
     }
 
     /* =========================================================
+       ANALYTICS (DIY track — Telegram ID on open)
+       ========================================================= */
+    (function trackUser() {
+      const userId = state.telegramUserId;
+      if (!userId) return;
+      fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          username: state.telegramUsername,
+          firstName: state.telegramFirstName
+        })
+      }).catch(err => console.log('[PopZen] Tracking failed:', err));
+    })();
+
+    /* =========================================================
+       CHANNEL GATE
+       ========================================================= */
+    async function checkMembership() {
+      if (!state.telegramUserId) {
+        // Not running inside Telegram — can't verify. Allow play but warn.
+        state.verified = true;
+        gateOverlay.classList.remove('show');
+        return;
+      }
+      gateOverlay.classList.add('show');
+      gateStatus.textContent = 'Checking membership…';
+      gateSpinner.style.display = 'block';
+      gateJoinBtn.style.display = 'none';
+      gateCheckBtn.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/check-member', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: state.telegramUserId })
+        });
+        const data = await res.json();
+        if (data.isMember) {
+          state.verified = true;
+          gateOverlay.classList.remove('show');
+          return;
+        }
+        // Not a member — show join + verify buttons
+        gateStatus.textContent = 'You are not a member yet.';
+        gateSpinner.style.display = 'none';
+        gateJoinBtn.style.display = 'block';
+        gateCheckBtn.style.display = 'block';
+      } catch (err) {
+        console.error('[PopZen] Membership check failed:', err);
+        gateStatus.textContent = 'Could not verify membership. Try again.';
+        gateSpinner.style.display = 'none';
+        gateJoinBtn.style.display = 'block';
+        gateCheckBtn.style.display = 'block';
+      }
+    }
+
+    gateJoinBtn.addEventListener('click', () => {
+      const url = CHANNEL_URL;
+      if (tg && tg.openTelegramLink) tg.openTelegramLink(url);
+      else window.open(url, '_blank');
+    });
+
+    gateCheckBtn.addEventListener('click', () => {
+      checkMembership();
+    });
+
+    /* =========================================================
        MODE SWITCH
        ========================================================= */
     function setMode(mode) {
       state.mode = mode;
       tabs.forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
       panelBubbles.classList.toggle('active', mode === 'bubbles');
-      panelSlime.classList.toggle('active', mode === 'slime');
-      state.score = 0;
-      state.gameOver = false;
-      state.recordShownThisGame = false;
-      scoreEl.textContent = '0';
-      if (mode === 'bubbles') buildGrid();
-      else resetSlime();
-      updateAdButton();
+      panelLeaderboard.classList.toggle('active', mode === 'leaderboard');
+      if (mode === 'bubbles') {
+        state.score = 0;
+        state.gameOver = false;
+        state.recordShownThisGame = false;
+        scoreEl.textContent = '0';
+        buildGrid();
+        updateAdButton();
+      } else if (mode === 'leaderboard') {
+        loadLeaderboard();
+      }
     }
     tabs.forEach(t => t.addEventListener('click', () => setMode(t.dataset.mode)));
 
     /* =========================================================
        BUBBLES MODE
        ========================================================= */
-    const GRID_COUNT = 36;
-
     function trapRateForScore(score) {
       if (score <= 10) return 0.08;
       if (score <= 25) return 0.15;
@@ -473,7 +600,8 @@
           b.classList.add('trap');
           b.dataset.trap = '1';
         }
-        const scale = 0.85 + Math.random() * 0.25;
+        // Random size 0.6–1.05 for visual variety
+        const scale = 0.6 + Math.random() * 0.45;
         b.style.transform = `scale(${scale})`;
         b.addEventListener('pointerdown', () => handleBubbleClick(b));
         gridEl.appendChild(b);
@@ -484,6 +612,7 @@
 
     function handleBubbleClick(el) {
       if (state.gameOver) return;
+      if (!state.verified) return;
       if (el.classList.contains('popped') || el.classList.contains('fading')) return;
 
       if (el.classList.contains('trap')) {
@@ -526,10 +655,40 @@
         haptic('medium');
         document.getElementById('recordScore').textContent = v;
         recordOverlay.classList.add('show');
+        // Persist score to backend for leaderboard (debounced)
+        submitScoreDebounced(v);
       } else if (v > state.bestScore) {
         state.bestScore = v;
         bestEl.textContent = v;
         localStorage.setItem('popzen_best', String(v));
+      }
+    }
+
+    /* Debounced score submit to /api/score */
+    let scoreTimer = null;
+    function submitScoreDebounced(score) {
+      if (!state.telegramUserId) return;
+      clearTimeout(scoreTimer);
+      scoreTimer = setTimeout(() => submitScore(score), 1200);
+    }
+    async function submitScore(score) {
+      if (state.scoreWritePending) return;
+      state.scoreWritePending = true;
+      try {
+        await fetch('/api/score', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: state.telegramUserId,
+            username: state.telegramUsername,
+            firstName: state.telegramFirstName,
+            score
+          })
+        });
+      } catch (err) {
+        console.log('[PopZen] Score submit failed:', err);
+      } finally {
+        state.scoreWritePending = false;
       }
     }
 
@@ -577,133 +736,14 @@
     }, 500);
 
     /* =========================================================
-       SLIME MODE
+       AD BUTTON
        ========================================================= */
-    const svg = document.getElementById('slimeSvg');
-    const slimePath = document.getElementById('slimeBody');
-    const slimeWrap = document.getElementById('slimeWrap');
-
-    const slime = {
-      cx: 150, cy: 150, baseR: 70,
-      pullX: 0, pullY: 0,
-      targetX: 0, targetY: 0,
-      velX: 0, velY: 0,
-      dragging: false,
-      raf: null,
-      squishPlayed: false,
-    };
-
-    function slimeLoop() {
-      const stiffness = slime.dragging ? 0.25 : 0.08;
-      const damping = slime.dragging ? 0.75 : 0.82;
-      slime.velX = (slime.velX + (slime.targetX - slime.pullX) * stiffness) * damping;
-      slime.velY = (slime.velY + (slime.targetY - slime.pullY) * stiffness) * damping;
-      slime.pullX += slime.velX;
-      slime.pullY += slime.velY;
-
-      drawSlime();
-
-      const dist = Math.hypot(slime.pullX, slime.pullY);
-      if (dist > 40 && !slime.squishPlayed) {
-        slime.squishPlayed = true;
-        playSquish();
-        haptic('medium');
-      } else if (dist < 20) {
-        slime.squishPlayed = false;
-      }
-
-      slime.raf = requestAnimationFrame(slimeLoop);
+    function nextLocked() {
+      return state.bubbleSkins.find(s => !state.bubbleUnlocked.has(s));
     }
-
-    function drawSlime() {
-      const { cx, cy, baseR, pullX, pullY } = slime;
-      const d = Math.hypot(pullX, pullY);
-      const angle = Math.atan2(pullY, pullX);
-      const stretch = Math.min(1.8, 1 + d / 200);
-      const squash = 1 / stretch;
-
-      const noseX = cx + Math.cos(angle) * (baseR * stretch);
-      const noseY = cy + Math.sin(angle) * (baseR * stretch);
-      const backX = cx - Math.cos(angle) * (baseR * squash * 0.9);
-      const backY = cy - Math.sin(angle) * (baseR * squash * 0.9);
-
-      const perpX = -Math.sin(angle);
-      const perpY = Math.cos(angle);
-      const sideOffset = baseR * (1 - 0.15 * (stretch - 1));
-
-      const s1x = cx + perpX * sideOffset;
-      const s1y = cy + perpY * sideOffset;
-      const s2x = cx - perpX * sideOffset;
-      const s2y = cy - perpY * sideOffset;
-
-      const c1x = (noseX + s1x) / 2 + perpX * baseR * 0.6;
-      const c1y = (noseY + s1y) / 2 + perpY * baseR * 0.6;
-      const c2x = (noseX + s2x) / 2 - perpX * baseR * 0.6;
-      const c2y = (noseY + s2y) / 2 - perpY * baseR * 0.6;
-      const c3x = (backX + s2x) / 2 - perpX * baseR * 0.5;
-      const c3y = (backY + s2y) / 2 - perpY * baseR * 0.5;
-      const c4x = (backX + s1x) / 2 + perpX * baseR * 0.5;
-      const c4y = (backY + s1y) / 2 + perpY * baseR * 0.5;
-
-      const d_path =
-        `M ${s1x} ${s1y} ` +
-        `Q ${c1x} ${c1y} ${noseX} ${noseY} ` +
-        `Q ${c2x} ${c2y} ${s2x} ${s2y} ` +
-        `Q ${c3x} ${c3y} ${backX} ${backY} ` +
-        `Q ${c4x} ${c4y} ${s1x} ${s1y} Z`;
-
-      slimePath.setAttribute('d', d_path);
-    }
-
-    function resetSlime() {
-      slime.pullX = 0; slime.pullY = 0;
-      slime.targetX = 0; slime.targetY = 0;
-      slime.velX = 0; slime.velY = 0;
-      slime.dragging = false;
-      if (!slime.raf) slime.raf = requestAnimationFrame(slimeLoop);
-    }
-
-    function slimePointer(e) {
-      const rect = svg.getBoundingClientRect();
-      const x = ((e.clientX - rect.left) / rect.width) * 300;
-      const y = ((e.clientY - rect.top) / rect.height) * 300;
-      const dx = x - slime.cx;
-      const dy = y - slime.cy;
-      const maxPull = 90;
-      const dist = Math.hypot(dx, dy);
-      const f = dist > maxPull ? maxPull / dist : 1;
-      slime.targetX = dx * f;
-      slime.targetY = dy * f;
-      const currentDist = Math.hypot(slime.targetX, slime.targetY);
-      if (currentDist > state.score) {
-        setScore(Math.floor(currentDist));
-      }
-    }
-
-    slimeWrap.addEventListener('pointerdown', (e) => {
-      slime.dragging = true;
-      slime.squishPlayed = false;
-      slimePointer(e);
-      slimeWrap.setPointerCapture?.(e.pointerId);
-    });
-    slimeWrap.addEventListener('pointermove', (e) => {
-      if (slime.dragging) slimePointer(e);
-    });
-    slimeWrap.addEventListener('pointerup', () => { slime.dragging = false; slime.targetX = 0; slime.targetY = 0; });
-    slimeWrap.addEventListener('pointerleave', () => { slime.dragging = false; slime.targetX = 0; slime.targetY = 0; });
-
-    /* =========================================================
-       SKIN / AD BUTTON
-       ========================================================= */
-    function nextLocked(mode) {
-      if (mode === 'bubbles') return state.bubbleSkins.find(s => !state.bubbleUnlocked.has(s));
-      return state.slimeSkins.find(s => !state.slimeUnlocked.has(s));
-    }
-
     function cooldownRemaining() {
       return Math.max(0, state.adCooldownUntil - Date.now());
     }
-
     function updateAdButton() {
       if (state.adPlaying) {
         adBtn.textContent = 'Loading ad...';
@@ -717,10 +757,10 @@
         setTimeout(updateAdButton, 500);
         return;
       }
-      const next = nextLocked(state.mode);
+      const next = nextLocked();
       adBtn.textContent = next
-        ? `🎁 Unlock ${next} + 👁️ 60s`
-        : `👁️ Watch ad — 60s Trap Vision`;
+        ? `🎁 Unlock ${next} + 👁️ 10s`
+        : `👁️ Watch ad — 10s Trap Vision`;
       adBtn.disabled = false;
     }
 
@@ -729,16 +769,9 @@
       document.body.classList.remove('skin-glitter', 'skin-neon');
       if (skin !== 'default') document.body.classList.add(`skin-${skin}`);
     }
-    function applySlimeSkin(skin) {
-      state.slimeActive = skin;
-      document.body.classList.remove('slime-glitter', 'slime-lava');
-      if (skin !== 'default') document.body.classList.add(`slime-${skin}`);
-    }
 
     /* =========================================================
-       MONETAG REWARDED INTERSTITIAL
-       SDK function: show_12162761
-       Reward fires directly on Promise resolve.
+       MONETAG REWARDED AD
        ========================================================= */
     async function watchRewardedAd() {
       if (state.adPlaying) return;
@@ -747,7 +780,6 @@
       const showAd = window.show_12162761;
       if (typeof showAd !== 'function') {
         showToast('Ad SDK not loaded');
-        console.warn('[PopZen] show_12162761 not found.');
         return;
       }
 
@@ -756,32 +788,22 @@
 
       try {
         try { await showAd({ type: 'preload' }); } catch (e) {}
-
         await showAd();
 
-        // Reward: unlock next skin (if any) AND grant 60s trap vision (always).
         let unlockedSkin = null;
-        if (state.mode === 'bubbles') {
-          unlockedSkin = nextLocked('bubbles');
-          if (unlockedSkin) {
-            state.bubbleUnlocked.add(unlockedSkin);
-            applyBubbleSkin(unlockedSkin);
-          }
-        } else {
-          unlockedSkin = nextLocked('slime');
-          if (unlockedSkin) {
-            state.slimeUnlocked.add(unlockedSkin);
-            applySlimeSkin(unlockedSkin);
-          }
+        unlockedSkin = nextLocked();
+        if (unlockedSkin) {
+          state.bubbleUnlocked.add(unlockedSkin);
+          applyBubbleSkin(unlockedSkin);
         }
 
-        grantTrapVision(60000);
-        state.adCooldownUntil = Date.now() + state.adCooldownMs;
+        grantTrapVision(TRAP_VISION_MS);
+        state.adCooldownUntil = Date.now() + AD_COOLDOWN_MS;
 
         if (unlockedSkin) {
-          showToast(`"${unlockedSkin}" skin + 👁️ 60s Trap Vision!`);
+          showToast(`"${unlockedSkin}" skin + 👁️ 10s Trap Vision!`);
         } else {
-          showToast('👁️ 60s Trap Vision granted!');
+          showToast('👁️ 10s Trap Vision granted!');
         }
       } catch (err) {
         console.error('[PopZen] Ad error:', err);
@@ -791,15 +813,74 @@
         updateAdButton();
       }
     }
+    adBtn.addEventListener('click', watchRewardedAd);
 
     /* =========================================================
-       SHARE FEATURE
+       LEADERBOARD
+       ========================================================= */
+    function prizeForRank(rank, isHouse) {
+      if (isHouse) return '—';
+      if (rank === 1) return '$10';
+      if (rank === 2 || rank === 3) return '$5';
+      if (rank >= 4 && rank <= 10) return '$2';
+      return '—';
+    }
+
+    async function loadLeaderboard() {
+      leaderboardList.innerHTML = '<div class="lb-empty">Loading…</div>';
+      try {
+        const res = await fetch(`/api/leaderboard?limit=${LEADERBOARD_LIMIT}`);
+        const data = await res.json();
+        if (!data.rows || data.rows.length === 0) {
+          leaderboardList.innerHTML = '<div class="lb-empty">No scores yet — be the first!</div>';
+          return;
+        }
+        leaderboardList.innerHTML = '';
+        data.rows.forEach((row, i) => {
+          const rank = i + 1;
+          const isHouse = row.is_house === true;
+          const isSelf = row.telegram_id === state.telegramUserId;
+          const name = isHouse
+            ? 'Pop Lion'
+            : (row.username ? '@' + row.username : (row.first_name || 'Player'));
+          const div = document.createElement('div');
+          div.className = 'lb-row'
+            + (isHouse ? ' house' : '')
+            + (isSelf ? ' self' : '');
+          div.innerHTML = `
+            <div class="lb-rank">${isHouse ? '🏠' : '#' + rank}</div>
+            <div class="lb-name">
+              ${escapeHtml(name)}
+              ${isHouse ? '<span class="lb-badge">HOUSE</span>' : ''}
+            </div>
+            <div class="lb-score">${row.best_score}</div>
+            <div class="lb-prize ${isHouse || rank > 10 ? 'none' : ''}">
+              ${prizeForRank(isHouse ? 99 : rank, isHouse)}
+            </div>
+          `;
+          leaderboardList.appendChild(div);
+        });
+      } catch (err) {
+        console.error('[PopZen] Leaderboard load failed:', err);
+        leaderboardList.innerHTML = '<div class="lb-empty">Could not load leaderboard.</div>';
+      }
+    }
+    lbRefreshBtn.addEventListener('click', loadLeaderboard);
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    /* =========================================================
+       SHARE
        ========================================================= */
     function shareApp() {
       const botUsername = 'PopZenPlayBot';
       const scoreText = state.score > 0
         ? `I scored ${state.score} on PopZen! Beat me →`
-        : `🫧 I'm hooked on PopZen — pop bubbles & stretch slime to relax. Try it!`;
+        : `🫧 I'm hooked on PopZen — pop bubbles to relax. Try it!`;
       const shareUrl = `https://t.me/${botUsername}/play`;
 
       if (tg && tg.openTelegramLink) {
@@ -811,7 +892,7 @@
         navigator.share({ title: 'PopZen', text: scoreText, url: shareUrl }).catch(() => {});
       } else if (navigator.clipboard) {
         navigator.clipboard.writeText(scoreText + '\n' + shareUrl)
-          .then(() => showToast('Link copied! Paste it anywhere 📋'))
+          .then(() => showToast('Link copied!'))
           .catch(() => showToast('Could not share'));
       } else {
         showToast('Sharing not available');
@@ -832,18 +913,12 @@
       state.gameOver = false;
       state.recordShownThisGame = false;
       scoreEl.textContent = '0';
-      if (state.mode === 'bubbles') {
-        buildGrid();
-      } else {
-        resetSlime();
-      }
+      buildGrid();
     }
     document.getElementById('restartBtn').addEventListener('click', restartGame);
 
     /* =========================================================
-       DAILY STREAK SYSTEM
-       Milestones grant FREE SKINS only. NEVER trap vision.
-       Trap vision is AD-ONLY (see watchRewardedAd above).
+       STREAK
        ========================================================= */
     function checkStreak() {
       const today = new Date().toISOString().slice(0, 10);
@@ -851,11 +926,9 @@
       let streak = parseInt(localStorage.getItem('popzen_streak') || '0', 10);
 
       if (last === today) {
-        // Already opened today
+        // already opened today
       } else if (last) {
-        const diffDays = Math.round(
-          (new Date(today) - new Date(last)) / 86400000
-        );
+        const diffDays = Math.round((new Date(today) - new Date(last)) / 86400000);
         streak = diffDays === 1 ? streak + 1 : 1;
       } else {
         streak = 1;
@@ -870,20 +943,13 @@
       banner.style.display = 'flex';
       countEl.textContent = streak;
 
-      // Milestone free-skin unlocks (NO trap vision here — AD-ONLY)
-      const milestones = { 3: 'glitter', 7: 'neon', 14: 'lava' };
+      const milestones = { 3: 'glitter', 7: 'neon' };
       let rewardMsg = '';
       const milestoneSkin = milestones[streak];
-      if (milestoneSkin) {
-        if (state.bubbleSkins.includes(milestoneSkin) && !state.bubbleUnlocked.has(milestoneSkin)) {
-          state.bubbleUnlocked.add(milestoneSkin);
-          applyBubbleSkin(milestoneSkin);
-          rewardMsg = `🎁 Free "${milestoneSkin}" bubble skin!`;
-        } else if (state.slimeSkins.includes(milestoneSkin) && !state.slimeUnlocked.has(milestoneSkin)) {
-          state.slimeUnlocked.add(milestoneSkin);
-          applySlimeSkin(milestoneSkin);
-          rewardMsg = `🎁 Free "${milestoneSkin}" slime skin!`;
-        }
+      if (milestoneSkin && state.bubbleSkins.includes(milestoneSkin) && !state.bubbleUnlocked.has(milestoneSkin)) {
+        state.bubbleUnlocked.add(milestoneSkin);
+        applyBubbleSkin(milestoneSkin);
+        rewardMsg = `🎁 Free "${milestoneSkin}" skin!`;
       }
 
       if (rewardMsg) {
@@ -891,7 +957,7 @@
         showToast(rewardMsg);
         updateAdButton();
       } else {
-        const next = streak < 3 ? 3 : streak < 7 ? 7 : streak < 14 ? 14 : null;
+        const next = streak < 3 ? 3 : streak < 7 ? 7 : null;
         rewardEl.textContent = next
           ? `${next - streak} day${next - streak > 1 ? 's' : ''} to free skin`
           : '🔥 Max streak!';
@@ -899,19 +965,13 @@
     }
 
     /* =========================================================
-       WIRE UP
-       ========================================================= */
-    adBtn.addEventListener('click', watchRewardedAd);
-
-    /* =========================================================
-       INIT SEQUENCE
+       INIT
        ========================================================= */
     buildGrid();
     applyBubbleSkin('default');
-    applySlimeSkin('default');
-    resetSlime();
     checkStreak();
     updateAdButton();
+    checkMembership();
   </script>
 </body>
 </html>
