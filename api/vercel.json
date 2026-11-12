@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/house-levelup",
+      "schedule": "0 12 * * *"
+    }
+  ]
+}
