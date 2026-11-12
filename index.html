@@ -109,7 +109,6 @@
     .bubble.c4 { background: radial-gradient(circle at 30% 30%, #d4a5ff, #8a2be2); }
     .bubble.c5 { background: radial-gradient(circle at 30% 30%, #ffd1ff, #ff6bcb); }
 
-    /* Skins must NOT affect traps */
     body.skin-glitter .bubble:not(.trap.visible) {
       background-image:
         radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9) 0%, transparent 40%),
@@ -122,7 +121,6 @@
                   inset 3px 3px 8px rgba(255,255,255,0.35);
     }
 
-    /* Traps — hidden by default, visible only with trap vision */
     .bubble.trap { pointer-events: auto; }
     .bubble.trap.visible {
       background: radial-gradient(circle at 35% 30%, #ff6b6b, #c0392b) !important;
@@ -197,6 +195,11 @@
       font-size: 13px; font-weight: 600; color: #fff;
       margin-top: 8px; cursor: pointer; width: 100%;
     }
+    #withdrawBtn {
+      background: rgba(255,215,0,0.2);
+      border: 1px solid rgba(255,215,0,0.5);
+      color: #ffd700;
+    }
 
     /* Footer */
     .footer { margin-top: 12px; display: flex; gap: 8px; }
@@ -268,6 +271,14 @@
       border: 1px solid rgba(255,255,255,0.2);
       margin-top: 10px; font-size: 14px;
     }
+    .wallet-input {
+      width: 100%; padding: 12px; border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.08); color: #fff;
+      font-size: 14px; margin-bottom: 12px;
+      outline: none;
+    }
+    .wallet-input:focus { border-color: rgba(138,123,255,0.7); }
 
     /* Channel gate overlay */
     #gateOverlay {
@@ -294,10 +305,8 @@
       </div>
     </header>
 
-    <!-- Trap vision countdown -->
     <div id="trapVisionBar">👁️ Trap Vision — <span id="trapVisionSecs">0</span>s</div>
 
-    <!-- Daily streak banner -->
     <div id="streakBanner" class="streak-banner" style="display:none;">
       🔥 <span id="streakCount">0</span>-day streak
       <span id="streakReward" class="streak-reward"></span>
@@ -308,18 +317,17 @@
       <div class="tab" data-mode="leaderboard">🏆 Leaderboard</div>
     </div>
 
-    <!-- BUBBLES PANEL -->
     <div class="panel active" id="panel-bubbles">
       <div id="grid"></div>
     </div>
 
-    <!-- LEADERBOARD PANEL -->
     <div class="panel" id="panel-leaderboard">
       <div id="leaderboardWrap">
         <div id="leaderboardList">
           <div class="lb-empty">Loading leaderboard…</div>
         </div>
         <button class="lb-refresh" id="lbRefreshBtn">🔄 Refresh</button>
+        <button class="lb-refresh" id="withdrawBtn">💎 Withdraw</button>
       </div>
     </div>
 
@@ -364,6 +372,19 @@
     </div>
   </div>
 
+  <!-- Withdraw overlay -->
+  <div id="withdrawOverlay" class="overlay">
+    <div class="overlay-card">
+      <div class="overlay-emoji">💎</div>
+      <div class="overlay-title">Withdraw</div>
+      <div class="overlay-sub" id="withdrawStatus">Checking eligibility…</div>
+      <input id="walletInput" class="wallet-input" type="text"
+        placeholder="UQ… or EQ… TON address" style="display:none;" />
+      <button class="overlay-btn" id="walletSaveBtn" style="display:none;">Save wallet</button>
+      <button class="overlay-btn secondary" id="withdrawCloseBtn">Close</button>
+    </div>
+  </div>
+
   <script>
     /* =========================================================
        TELEGRAM
@@ -374,10 +395,9 @@
     /* =========================================================
        CONFIG
        ========================================================= */
-    const CHANNEL_URL = 'https://t.me/popzen_community'; // change if your channel username differs
-    const CHANNEL_USERNAME = 'popzen_community';          // without @, or numeric -100… in env
-    const TRAP_VISION_MS = 10000;                      // 10 seconds
-    const AD_COOLDOWN_MS = 10000;                      // 10 seconds
+    const CHANNEL_URL = 'https://t.me/+YOUR_INVITE_LINK_HERE'; // ← replace with real invite link
+    const TRAP_VISION_MS = 10000;
+    const AD_COOLDOWN_MS = 10000;
     const GRID_COUNT = 36;
     const LEADERBOARD_LIMIT = 50;
 
@@ -427,6 +447,12 @@
     const gateCheckBtn = document.getElementById('gateCheckBtn');
     const leaderboardList = document.getElementById('leaderboardList');
     const lbRefreshBtn = document.getElementById('lbRefreshBtn');
+    const withdrawBtn = document.getElementById('withdrawBtn');
+    const withdrawOverlay = document.getElementById('withdrawOverlay');
+    const withdrawStatus = document.getElementById('withdrawStatus');
+    const walletInput = document.getElementById('walletInput');
+    const walletSaveBtn = document.getElementById('walletSaveBtn');
+    const withdrawCloseBtn = document.getElementById('withdrawCloseBtn');
 
     bestEl.textContent = state.bestScore;
 
@@ -476,7 +502,7 @@
     }
 
     /* =========================================================
-       ANALYTICS (DIY track — Telegram ID on open)
+       ANALYTICS
        ========================================================= */
     (function trackUser() {
       const userId = state.telegramUserId;
@@ -497,7 +523,6 @@
        ========================================================= */
     async function checkMembership() {
       if (!state.telegramUserId) {
-        // Not running inside Telegram — can't verify. Allow play but warn.
         state.verified = true;
         gateOverlay.classList.remove('show');
         return;
@@ -520,7 +545,6 @@
           gateOverlay.classList.remove('show');
           return;
         }
-        // Not a member — show join + verify buttons
         gateStatus.textContent = 'You are not a member yet.';
         gateSpinner.style.display = 'none';
         gateJoinBtn.style.display = 'block';
@@ -535,9 +559,8 @@
     }
 
     gateJoinBtn.addEventListener('click', () => {
-      const url = CHANNEL_URL;
-      if (tg && tg.openTelegramLink) tg.openTelegramLink(url);
-      else window.open(url, '_blank');
+      if (tg && tg.openTelegramLink) tg.openTelegramLink(CHANNEL_URL);
+      else window.open(CHANNEL_URL, '_blank');
     });
 
     gateCheckBtn.addEventListener('click', () => {
@@ -600,7 +623,6 @@
           b.classList.add('trap');
           b.dataset.trap = '1';
         }
-        // Random size 0.6–1.05 for visual variety
         const scale = 0.6 + Math.random() * 0.45;
         b.style.transform = `scale(${scale})`;
         b.addEventListener('pointerdown', () => handleBubbleClick(b));
@@ -655,7 +677,6 @@
         haptic('medium');
         document.getElementById('recordScore').textContent = v;
         recordOverlay.classList.add('show');
-        // Persist score to backend for leaderboard (debounced)
         submitScoreDebounced(v);
       } else if (v > state.bestScore) {
         state.bestScore = v;
@@ -664,7 +685,6 @@
       }
     }
 
-    /* Debounced score submit to /api/score */
     let scoreTimer = null;
     function submitScoreDebounced(score) {
       if (!state.telegramUserId) return;
@@ -698,20 +718,17 @@
     function trapVisionActive() {
       return Date.now() < state.trapVisionUntil;
     }
-
     function grantTrapVision(ms) {
       state.trapVisionUntil = Date.now() + ms;
       refreshTrapVisibility();
       updateTrapVisionUI();
     }
-
     function refreshTrapVisibility() {
       const active = trapVisionActive();
       gridEl.querySelectorAll('.bubble.trap').forEach(el => {
         el.classList.toggle('visible', active);
       });
     }
-
     function updateTrapVisionUI() {
       const remaining = state.trapVisionUntil - Date.now();
       if (remaining > 0) {
@@ -723,7 +740,6 @@
         adBtn.classList.remove('tv-active');
       }
     }
-
     setInterval(() => {
       if (state.trapVisionUntil > 0) {
         updateTrapVisionUI();
@@ -770,9 +786,6 @@
       if (skin !== 'default') document.body.classList.add(`skin-${skin}`);
     }
 
-    /* =========================================================
-       MONETAG REWARDED AD
-       ========================================================= */
     async function watchRewardedAd() {
       if (state.adPlaying) return;
       if (cooldownRemaining() > 0) return;
@@ -872,6 +885,73 @@
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
       }[c]));
     }
+
+    /* =========================================================
+       WITHDRAW
+       ========================================================= */
+    async function openWithdraw() {
+      if (!state.telegramUserId) return;
+      withdrawOverlay.classList.add('show');
+      withdrawStatus.textContent = 'Checking eligibility…';
+      walletInput.style.display = 'none';
+      walletSaveBtn.style.display = 'none';
+      try {
+        const res = await fetch(`/api/payout?userId=${state.telegramUserId}`);
+        const data = await res.json();
+        if (!data.eligible) {
+          withdrawStatus.textContent = data.rank
+            ? `You need to be in the top 10 (you're #${data.rank}).`
+            : `You're not on the leaderboard yet.`;
+          return;
+        }
+        if (data.claimedAt) {
+          withdrawStatus.textContent = `You were paid on ${new Date(data.claimedAt).toLocaleDateString()}.`;
+          return;
+        }
+        withdrawStatus.textContent = data.wallet
+          ? `You're eligible! Wallet saved. Payouts on the 20th.`
+          : `You're eligible! Enter your TON wallet address.`;
+        walletInput.value = data.wallet || '';
+        walletInput.style.display = 'block';
+        walletSaveBtn.style.display = 'block';
+      } catch (err) {
+        console.error('[PopZen] Withdraw check failed:', err);
+        withdrawStatus.textContent = 'Could not check eligibility.';
+      }
+    }
+
+    withdrawBtn.addEventListener('click', openWithdraw);
+    withdrawCloseBtn.addEventListener('click', () => {
+      withdrawOverlay.classList.remove('show');
+    });
+
+    walletSaveBtn.addEventListener('click', async () => {
+      const wallet = walletInput.value.trim();
+      if (!wallet) {
+        withdrawStatus.textContent = 'Please enter a wallet address.';
+        return;
+      }
+      withdrawStatus.textContent = 'Saving…';
+      walletSaveBtn.disabled = true;
+      try {
+        const res = await fetch('/api/payout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: state.telegramUserId, wallet })
+        });
+        const data = await res.json();
+        if (data.success) {
+          withdrawStatus.textContent = '✅ Wallet saved. Payouts on the 20th.';
+        } else {
+          withdrawStatus.textContent = '❌ ' + (data.error || 'Failed to save');
+        }
+      } catch (err) {
+        console.error('[PopZen] Wallet save failed:', err);
+        withdrawStatus.textContent = '❌ Network error';
+      } finally {
+        walletSaveBtn.disabled = false;
+      }
+    });
 
     /* =========================================================
        SHARE
